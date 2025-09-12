@@ -186,9 +186,32 @@ def main():
     st.title("Service Tracker")
     ensure_data_files()
 
-    menu = ["Home", "Add Technician", "List Technicians", "Add Task", "List Tasks", 
-            "Mark Task Done", "Update Task", "Delete Task", "Report Last 30 Days"]
-    choice = st.sidebar.selectbox("Menu", menu)
+    # Define menu options
+    menu = [
+        "Home",
+        "Add Technician",
+        "List Technicians",
+        "Add Task",
+        "List Tasks",
+        "Mark Task Done",
+        "Update Task",
+        "Delete Task",
+        "Report Last 30 Days"
+    ]
+
+    # Initialize session state for menu
+    if "selected_menu" not in st.session_state:
+        st.session_state.selected_menu = "Home"
+
+    # Sidebar buttons
+    st.sidebar.title("Menu")
+    for item in menu:
+        if st.sidebar.button(item):
+            st.session_state.selected_menu = item
+
+    # Display corresponding screen
+    choice = st.session_state.selected_menu
+    st.subheader(choice)
 
     if choice == "Home":
         st.write("Welcome to the Service Tracker App!")
@@ -213,6 +236,5 @@ def main():
     else:
         st.write("Unknown option.")
 
-if __name__ == "__main__":
     main()
 
