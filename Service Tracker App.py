@@ -235,6 +235,5 @@ def main():
         report_ui()
     else:
         st.write("Unknown option.")
-
+if __name__ == "__main__":
     main()
-
