@@ -4,19 +4,22 @@ import os
 from datetime import datetime, timedelta
 import subprocess
 import platform
-import shutil  # for shutil.which()
+import shutil  # for checking which binary exists
 
 # Config
 SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\schwe tracker app files"
 TECH_FILE = os.path.join(SYNCED_FOLDER, "tech.json")
 
+
 def ensure_synced_folder():
     os.makedirs(SYNCED_FOLDER, exist_ok=True)
+
 
 def ensure_tech_file():
     if not os.path.exists(TECH_FILE):
         with open(TECH_FILE, "w") as f:
             json.dump([], f)
+
 
 def load_tech_from_disk():
     try:
@@ -28,16 +31,19 @@ def load_tech_from_disk():
         st.error(f"Failed to load technician list: {e}")
         return []
 
+
 def save_tech_to_disk(tech_list):
     ensure_synced_folder()
     with open(TECH_FILE, "w") as f:
         json.dump(tech_list, f, indent=4)
+
 
 def get_technician_name(technicians, tech_id):
     for t in technicians:
         if t["id"] == tech_id:
             return t["name"]
     return "Unknown"
+
 
 def add_technician_ui():
     st.subheader("Add Technician")
@@ -70,6 +76,7 @@ def add_technician_ui():
             st.session_state["tech_phone"] = ""
             st.session_state["tech_email"] = ""
 
+
 def list_technicians_ui():
     st.subheader("Technicians")
     techs = st.session_state.tech
@@ -78,6 +85,7 @@ def list_technicians_ui():
     else:
         for t in techs:
             st.write(f"ID {t['id']}: {t['name']} | Phone: {t['phone']} | Email: {t['email']}")
+
 
 def add_task_ui():
     st.subheader("Add Task")
@@ -106,6 +114,7 @@ def add_task_ui():
             st.success(f"Task added: {description.strip()}")
             st.session_state["task_desc"] = ""
 
+
 def list_tasks_ui(show_all=True):
     st.subheader("Tasks")
     tasks = st.session_state.tasks
@@ -114,13 +123,13 @@ def list_tasks_ui(show_all=True):
         st.write("No tasks yet.")
         return
     for task in tasks:
-        if (not show_all) and task["done"]:
+        if not show_all and task["done"]:
             continue
         status = "✅ Done" if task["done"] else "❗ Pending"
         tech_name = get_technician_name(techs, task["technician_id"])
         created = datetime.fromisoformat(task["created_at"]).strftime("%Y-%m-%d")
-        line = f"ID {task['id']}: {task['description']} (Tech: {tech_name}) — Created: {created} — Status: {status}"
-        st.write(line)
+        st.write(f"ID {task['id']}: {task['description']} (Tech: {tech_name}) — Created: {created} — Status: {status}")
+
 
 def mark_task_done_ui():
     st.subheader("Mark Task as Done")
@@ -139,6 +148,7 @@ def mark_task_done_ui():
                 t["completed_at"] = datetime.now().isoformat()
                 st.success(f"Task ID {task_id} marked done.")
                 break
+
 
 def update_task_ui():
     st.subheader("Update Task Description")
@@ -161,6 +171,7 @@ def update_task_ui():
                     st.session_state["task_update_desc"] = ""
                     break
 
+
 def delete_task_ui():
     st.subheader("Delete Task")
     tasks = st.session_state.tasks
@@ -174,17 +185,13 @@ def delete_task_ui():
         tasks[:] = [t for t in tasks if t["id"] != task_id]
         st.success(f"Task ID {task_id} deleted.")
 
+
 def report_ui():
     st.subheader("Report: Tasks Completed in Last 30 Days")
     tasks = st.session_state.tasks
     techs = st.session_state.tech
     cutoff = datetime.now() - timedelta(days=30)
-    done_tasks = []
-    for t in tasks:
-        if t["done"] and t.get("completed_at"):
-            comp = datetime.fromisoformat(t["completed_at"])
-            if comp >= cutoff:
-                done_tasks.append(t)
+    done_tasks = [t for t in tasks if t["done"] and t.get("completed_at") and datetime.fromisoformat(t["completed_at"]) >= cutoff]
     if not done_tasks:
         st.write("No tasks completed in last 30 days.")
     else:
@@ -192,6 +199,7 @@ def report_ui():
             tech_name = get_technician_name(techs, t["technician_id"])
             comp = datetime.fromisoformat(t["completed_at"]).strftime("%Y-%m-%d")
             st.write(f"ID {t['id']}: {t['description']} — Tech: {tech_name} — Completed: {comp}")
+
 
 def import_technicians_ui():
     st.subheader("Import Technicians JSON")
@@ -208,6 +216,7 @@ def import_technicians_ui():
         except Exception as e:
             st.error(f"Failed to import: {e}")
 
+
 def export_technicians_ui():
     st.subheader("Export Technicians JSON")
     techs = st.session_state.tech
@@ -216,6 +225,7 @@ def export_technicians_ui():
     else:
         st.write("No technicians to export.")
 
+
 def list_files_in_folder(folder):
     try:
         return sorted([f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))])
@@ -223,39 +233,34 @@ def list_files_in_folder(folder):
         st.error(f"Failed to list files: {e}")
         return []
 
+
 def open_folder(path):
     system_platform = platform.system()
-    if not os.path.exists(path):
-        st.error(f"Folder does not exist: {path}")
-        return
-
     try:
         if system_platform == "Windows":
             os.startfile(path)
-            st.success("Folder opened in Windows Explorer.")
         elif system_platform == "Darwin":
             subprocess.run(["open", path])
-            st.success("Folder opened in Finder.")
         elif system_platform == "Linux":
-            # List of popular Linux file managers to try
-            file_managers = ["dolphin", "nautilus", "thunar", "pcmanfm", "caja", "xdg-open"]
-            found_fm = None
-            for fm in file_managers:
-                if shutil.which(fm) is not None:
-                    found_fm = fm
-                    break
-            if found_fm is None:
-                st.warning(f"No known file manager found. Please open the folder manually:\n{path}")
-                return
-            try:
-                subprocess.run([found_fm, path], check=True)
-                st.success(f"Folder opened with {found_fm}.")
-            except subprocess.CalledProcessError as e:
-                st.warning(f"Failed to open folder with {found_fm}. Please open it manually:\n{path}\nError: {e}")
+            for fm in ["dolphin", "nautilus", "thunar", "pcmanfm", "caja", "xdg-open"]:
+                if shutil.which(fm):
+                    subprocess.Popen([fm, path])
+                    return
+            for term in ["gnome-terminal", "konsole", "xterm", "lxterminal", "terminator"]:
+                if shutil.which(term):
+                    if term == "konsole":
+                        subprocess.Popen([term, "--workdir", path])
+                    elif term in ["gnome-terminal", "terminator", "lxterminal"]:
+                        subprocess.Popen([term, "--working-directory", path])
+                    elif term == "xterm":
+                        subprocess.Popen([term, "-e", f"bash -c 'cd \"{path}\"; exec bash'"])
+                    return
+            st.warning(f"No known file manager or terminal emulator found. Please open manually:\n{path}")
         else:
-            st.warning(f"Unsupported OS: {system_platform}. Please open the folder manually:\n{path}")
+            st.warning(f"Unsupported OS. Please open manually: {path}")
     except Exception as e:
         st.error(f"Failed to open folder: {e}")
+
 
 def main():
     st.title("Service Tracker")
@@ -265,7 +270,6 @@ def main():
 
     if "tech" not in st.session_state:
         st.session_state.tech = load_tech_from_disk()
-
     if "tasks" not in st.session_state:
         st.session_state.tasks = []
 
@@ -332,6 +336,7 @@ def main():
         export_technicians_ui()
     else:
         st.write("Unknown option.")
+
 
 if __name__ == "__main__":
     main()
