@@ -245,6 +245,29 @@ def list_files_in_folder(folder):
         st.error(f"Failed to list files: {e}")
         return []
 
+# Helper to open folder cross-platform
+def open_folder(path):
+    system_platform = platform.system()
+    # Optional debug message - comment out or remove in production
+    # st.write(f"Detected OS: {system_platform}")
+    try:
+        if system_platform == "Windows":
+            os.startfile(path)
+            st.success(f"Opened folder in Explorer: {path}")
+        elif system_platform == "Darwin":  # macOS
+            subprocess.run(["open", path])
+            st.success(f"Opened folder in Finder: {path}")
+        elif system_platform == "Linux":
+            try:
+                subprocess.run(["xdg-open", path])
+                st.success(f"Opened folder in File Manager: {path}")
+            except FileNotFoundError:
+                st.warning(f"'xdg-open' not found. Please open the folder manually: {path}")
+        else:
+            st.warning(f"Opening folders not supported on {system_platform}. Please open manually: {path}")
+    except Exception as e:
+        st.error(f"Failed to open folder: {e}")
+
 # MAIN FUNCTION
 def main():
     st.title("Service Tracker")
@@ -286,23 +309,11 @@ def main():
         st.write("Welcome to the Service Tracker App!")
         st.markdown("### Files in Synced Folder")
 
-        # Button to open folder in system file explorer
         if st.button("Open Synced Folder in Explorer"):
-            try:
-                system_platform = platform.system()
-                if system_platform == "Windows":
-                    os.startfile(SYNCED_FOLDER)
-                elif system_platform == "Darwin":  # macOS
-                    subprocess.run(["open", SYNCED_FOLDER])
-                elif system_platform == "Linux":
-                    try:
-                        subprocess.run(["xdg-open", SYNCED_FOLDER])
-                    except FileNotFoundError:
-                        st.warning(f"'xdg-open' not found. Please open folder manually: {SYNCED_FOLDER}")
-                else:
-                    st.warning(f"Opening folders not supported on {system_platform}.")
-            except Exception as e:
-                st.error(f"Failed to open folder: {e}")
+            if os.path.exists(SYNCED_FOLDER):
+                open_folder(SYNCED_FOLDER)
+            else:
+                st.error(f"Folder does not exist: {SYNCED_FOLDER}")
 
         files = list_files_in_folder(SYNCED_FOLDER)
         if not files:
