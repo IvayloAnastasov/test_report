@@ -1,19 +1,83 @@
 import streamlit as st
 import json
-import requests
 from datetime import datetime, timedelta
 
-# URL to tech.json on GitHub
-GITHUB_TECH_URL = "https://raw.githubusercontent.com/yourusername/yourrepo/main/data/tech.json"  # Replace this!
+# ---- Add these imports for Google Sheets ----
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-def load_tech_from_github():
-    try:
-        response = requests.get(GITHUB_TECH_URL)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        st.error(f"Failed to load technicians from GitHub: {e}")
-        return []
+# ---------------------- CONFIGURATION ----------------------
+
+# These are values you must set / fill in:
+SHEET_NAME = "Your Google Sheet Name Here"  # <-- your sheet title
+WORKSHEET_NAME = "Sheet1"  # <-- if you have multiple sheets/worksheets
+# If using .secrets in streamlit, put the service account JSON here:
+# e.g. in .streamlit/secrets.toml:
+# [google_service_account]
+# type = "service_account"
+# project_id = "..."
+# private_key_id = "..."
+# private_key = """-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"""
+# client_email = "..."
+# client_id = "..."
+# auth_uri = "..."
+# token_uri = "..."
+# etc.
+
+# The scope of permissions for the Google APIs
+GSCPREAD_SCOPE = [
+    "https://spreadsheets.google.com/feeds", 
+    "https://www.googleapis.com/auth/drive"
+]
+
+# ---------------------- GOOGLE SHEETS FUNCTIONS ----------------------
+
+def get_gsheet_client():
+    """Authorize and return a gspread client using service account credentials."""
+    creds_dict = st.secrets["google_service_account"]  # <-- ensure you have this in secrets
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, GSCPREAD_SCOPE)
+    client = gspread.authorize(creds)
+    return client
+
+def get_worksheet():
+    """Return the worksheet object where tasks will be stored."""
+    client = get_gsheet_client()
+    # Open the Google Sheet by name
+    sht = client.open(SHEET_NAME)
+    # Select the worksheet/tab
+    ws = sht.worksheet(WORKSHEET_NAME)
+    return ws
+
+def append_task_to_sheet(task, tech_name):
+    """Append a row for a newly added task."""
+    ws = get_worksheet()
+    row = [
+        task["id"],
+        tech_name,
+        task["description"],
+        task["created_at"],
+        "Pending",           # status when added
+        ""                   # no completed date yet
+    ]
+    ws.append_row(row)
+
+def update_task_status_in_sheet(task_id, completed_at):
+    """
+    Find the row with this task_id and update status + completed_at.
+    Assumes first row is headers, and columns are:
+    ID | Technician | Description | Created At | Status | Completed At
+    """
+    ws = get_worksheet()
+    all_records = ws.get_all_records()  # returns list of dicts mapping headers to values
+    # Find which row number, starting from 2 because row 1 is headers
+    for idx, rec in enumerate(all_records, start=2):
+        if str(rec.get("ID")) == str(task_id):
+            # Column 5 = Status; Column 6 = Completed At
+            ws.update_cell(idx, 5, "Done")
+            ws.update_cell(idx, 6, completed_at)
+            break
+
+# ---------------------- TASK MANAGEMENT ----------------------
 
 def get_technician_name(technicians, tech_id):
     for t in technicians:
@@ -23,14 +87,40 @@ def get_technician_name(technicians, tech_id):
 
 def add_technician_ui():
     st.subheader("Add Technician")
-    st.warning("Adding/editing technicians will not update GitHub. Read-only mode.")
-    st.info("Edit tech.json directly in your GitHub repo to change data.")
+    name = st.text_input("Name", key="tech_name")
+    phone = st.text_input("Phone", key="tech_phone")
+    email = st.text_input("Email", key="tech_email")
+
+    if st.button("Add Technician"):
+        if not name.strip():
+            st.warning("Name is required")
+        else:
+            techs = st.session_state.tech
+            existing_tech = next((t for t in techs if t["name"].lower() == name.strip().lower()), None)
+            if existing_tech:
+                existing_tech["phone"] = phone.strip()
+                existing_tech["email"] = email.strip()
+                st.success(f"Updated technician '{name.strip()}'")
+            else:
+                new_id = 1 + max([t["id"] for t in techs], default=0)
+                techs.append({
+                    "id": new_id,
+                    "name": name.strip(),
+                    "phone": phone.strip(),
+                    "email": email.strip()
+                })
+                st.success(f"Added technician '{name.strip()}'")
+            # Note: Technicians are not synced to Google Sheet in this version
+            st.session_state.tech = techs
+            st.session_state["tech_name"] = ""
+            st.session_state["tech_phone"] = ""
+            st.session_state["tech_email"] = ""
 
 def list_technicians_ui():
     st.subheader("Technicians")
     techs = st.session_state.tech
     if not techs:
-        st.write("No technicians found.")
+        st.write("No technicians yet.")
     else:
         for t in techs:
             st.write(f"ID {t['id']}: {t['name']} | Phone: {t['phone']} | Email: {t['email']}")
@@ -45,21 +135,27 @@ def add_task_ui():
     tech_options = {t["name"]: t["id"] for t in techs}
     selected_tech = st.selectbox("Assign to Technician", list(tech_options.keys()), key="task_tech")
     description = st.text_input("Task Description", key="task_desc")
+
     if st.button("Add Task"):
         if not description.strip():
             st.warning("Description is required.")
         else:
             new_id = 1 + max([t["id"] for t in tasks], default=0)
-            tasks.append({
+            task = {
                 "id": new_id,
                 "technician_id": tech_options[selected_tech],
                 "description": description.strip(),
                 "created_at": datetime.now().isoformat(),
                 "done": False,
                 "completed_at": None
-            })
+            }
+            tasks.append(task)
             st.success(f"Task added: {description.strip()}")
             st.session_state["task_desc"] = ""
+
+            # ---- HERE: after you add task, append to Google Sheet ----
+            tech_name = get_technician_name(techs, task["technician_id"])
+            append_task_to_sheet(task, tech_name)
 
 def list_tasks_ui(show_all=True):
     st.subheader("Tasks")
@@ -92,6 +188,8 @@ def mark_task_done_ui():
                 t["done"] = True
                 t["completed_at"] = datetime.now().isoformat()
                 st.success(f"Task ID {task_id} marked done.")
+                # ---- HERE: update Google Sheet for status/completed date ----
+                update_task_status_in_sheet(task_id, t["completed_at"])
                 break
 
 def report_ui():
@@ -108,29 +206,35 @@ def report_ui():
             comp = datetime.fromisoformat(t["completed_at"]).strftime("%Y-%m-%d")
             st.write(f"ID {t['id']}: {t['description']} — Tech: {tech_name} — Completed: {comp}")
 
-def main():
-    st.title("Service Tracker")
+def list_files_ui():  # optional, if you had files to list
+    pass  # removed local file operations
 
-    # Initialize state
+def main():
+    st.title("Service Tracker with Google Sheets Sync")
+
     if "tech" not in st.session_state:
-        st.session_state.tech = load_tech_from_github()
+        st.session_state.tech = []
     if "tasks" not in st.session_state:
         st.session_state.tasks = []
 
     menu = [
         "Home",
+        "Add Technician",
         "List Technicians",
         "Add Task",
         "List Tasks",
         "Mark Task Done",
         "Report Last 30 Days",
     ]
+
     st.sidebar.title("Menu")
     selected = st.sidebar.radio("Navigate", menu)
     st.subheader(selected)
 
     if selected == "Home":
         st.write("Welcome to the Service Tracker App!")
+    elif selected == "Add Technician":
+        add_technician_ui()
     elif selected == "List Technicians":
         list_technicians_ui()
     elif selected == "Add Task":
