@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timedelta
 
 # 🔧 SET THIS TO YOUR LOCAL SYNC FOLDER PATH
-SYNCED_FOLDER = "C:\Users\Ia\OneDrive - Eltronic Group A S\chwe tracker app files" 
+SYNCED_FOLDER = "C:\\Users\\Ia\\OneDrive - Eltronic Group A S\\chwe tracker app files"
 TECH_FILE = os.path.join(SYNCED_FOLDER, "tech.json")
 
 # ----------------------------
