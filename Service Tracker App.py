@@ -11,11 +11,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 SPREADSHEET_ID = "1tTjNIHuwQ0PcsfK2Si7IjLP_S0ZeJLmo7C1yMyGqw18"  # your Google Sheet ID
 WORKSHEET_NAME = "Sheet1"  # tab name
 
-# Github URL for technicians JSON
-TECH_GITHUB_URL = "https://raw.githubusercontent.com/IvayloAnastasov/test_report/refs/heads/main/tech_update.json"  
-# 🔧 Replace the above with your actual raw URL
+TECH_GITHUB_URL = "https://raw.githubusercontent.com/IvayloAnastasov/test_report/refs/heads/main/tech_update.json"
 
-# Google Sheets scopes
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -45,17 +42,43 @@ def append_task_to_sheet(task, tech_name):
         "Pending",
         ""
     ]
-    ws.append_row(row, value_input_option='USER_ENTERED')
+    try:
+        ws.append_row(row, value_input_option='USER_ENTERED')
+    except Exception as e:
+        st.error(f"Failed to append to Google Sheet: {e}")
 
 def update_task_status_in_sheet(task_id, completed_at):
     ws = get_worksheet()
     all_records = ws.get_all_records()
-    for idx, rec in enumerate(all_records, start=2):  # header is row 1
-        # make sure the header in your sheet is 'ID' exactly (case sensitive)
+    for idx, rec in enumerate(all_records, start=2):
         if str(rec.get("ID")) == str(task_id):
             ws.update_cell(idx, 5, "Done")           # column E
             ws.update_cell(idx, 6, completed_at)     # column F
             break
+
+def load_tasks_from_sheet():
+    ws = get_worksheet()
+    records = ws.get_all_records()
+    tasks = []
+    techs = st.session_state.get("tech", [])
+
+    for rec in records:
+        try:
+            tech_name = rec.get("Technician")
+            tech_id = next((t["id"] for t in techs if t["name"] == tech_name), None)
+
+            task = {
+                "id": int(rec.get("ID")),
+                "technician_id": tech_id,
+                "description": rec.get("Description"),
+                "created_at": rec.get("Created At"),
+                "done": rec.get("Status") == "Done",
+                "completed_at": rec.get("Completed At") if rec.get("Completed At") else None
+            }
+            tasks.append(task)
+        except Exception as e:
+            st.warning(f"Skipping row due to error: {e}")
+    return tasks
 
 # ---------------------- GITHUB TECHNICIANS LOAD ----------------------
 
@@ -64,7 +87,6 @@ def load_technicians_from_github():
         resp = requests.get(TECH_GITHUB_URL)
         resp.raise_for_status()
         data = resp.json()
-        # Expecting data to be a list of technicians: e.g. [{"id":1,"name":"Alice","phone":"...","email":"..."}, ...]
         if isinstance(data, list):
             return data
         else:
@@ -89,8 +111,8 @@ def list_technicians_ui():
         st.write("No technicians found.")
     else:
         for t in techs:
-            phone = t.get("phone","")
-            email = t.get("email","")
+            phone = t.get("phone", "")
+            email = t.get("email", "")
             st.write(f"ID {t['id']}: {t['name']} | Phone: {phone} | Email: {email}")
 
 def add_task_ui():
@@ -99,7 +121,6 @@ def add_task_ui():
     if not techs:
         st.warning("No technicians available.")
         return
-    tasks = st.session_state.tasks
 
     tech_options = {t["name"]: t["id"] for t in techs}
     selected_tech_name = st.selectbox("Assign to Technician", list(tech_options.keys()), key="task_tech")
@@ -109,7 +130,11 @@ def add_task_ui():
         if not description.strip():
             st.warning("Description is required.")
         else:
-            new_id = 1 + max([t["id"] for t in tasks], default=0)
+            ws = get_worksheet()
+            existing_tasks = ws.get_all_records()
+            existing_ids = [int(t.get("ID", 0)) for t in existing_tasks]
+            new_id = max(existing_ids or [0]) + 1
+
             task = {
                 "id": new_id,
                 "technician_id": tech_options[selected_tech_name],
@@ -118,14 +143,15 @@ def add_task_ui():
                 "done": False,
                 "completed_at": None
             }
-            tasks.append(task)
-            st.session_state.tasks = tasks
+
+            # Save to Google Sheet
+            append_task_to_sheet(task, selected_tech_name)
+
+            # Reload tasks from sheet
+            st.session_state.tasks = load_tasks_from_sheet()
+
             st.success(f"Task added: {description.strip()}")
             st.session_state["task_desc"] = ""
-
-            # Sync to sheet
-            tech_name = selected_tech_name
-            append_task_to_sheet(task, tech_name)
 
 def list_tasks_ui(show_all=True):
     st.subheader("Tasks")
@@ -157,9 +183,9 @@ def mark_task_done_ui():
             if t["id"] == task_id:
                 t["done"] = True
                 t["completed_at"] = datetime.now().isoformat()
-                st.session_state.tasks = tasks
-                st.success(f"Task ID {task_id} marked done.")
                 update_task_status_in_sheet(task_id, t["completed_at"])
+                st.session_state.tasks = load_tasks_from_sheet()
+                st.success(f"Task ID {task_id} marked done.")
                 break
 
 def report_ui():
@@ -185,8 +211,8 @@ def main():
     if "tech" not in st.session_state:
         st.session_state.tech = load_technicians_from_github()
 
-    if "tasks" not in st.session_state:
-        st.session_state.tasks = []
+    # Always load tasks from Google Sheets on each app load
+    st.session_state.tasks = load_tasks_from_sheet()
 
     menu = [
         "Home",
