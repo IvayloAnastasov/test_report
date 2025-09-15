@@ -245,12 +245,9 @@ def list_files_in_folder(folder):
         st.error(f"Failed to list files: {e}")
         return []
 
-# Open folder button handler
+# Open folder function: tries dolphin on Linux
 def open_folder(path):
     system_platform = platform.system()
-    st.write(f"Detected platform: {system_platform}")
-    st.write(f"Folder path: {path}")
-
     if not os.path.exists(path):
         st.error(f"Folder does not exist: {path}")
         return
@@ -264,10 +261,13 @@ def open_folder(path):
             st.success("Folder opened in Finder.")
         elif system_platform == "Linux":
             try:
-                subprocess.run(["xdg-open", path], check=True)
-                st.success("Folder opened in Linux file manager.")
+                # Try to open with dolphin only
+                subprocess.run(["dolphin", path], check=True)
+                st.success("Folder opened with Dolphin.")
             except FileNotFoundError:
-                st.warning(f"'xdg-open' not found. Please open the folder manually:\n{path}")
+                st.warning(f"'dolphin' not found. Please open the folder manually:\n{path}")
+            except subprocess.CalledProcessError as e:
+                st.warning(f"Failed to open folder with Dolphin. Please open it manually:\n{path}\nError: {e}")
         else:
             st.warning(f"Unsupported OS: {system_platform}. Please open the folder manually:\n{path}")
     except Exception as e:
