@@ -6,7 +6,7 @@ import subprocess
 import platform
 
 # Config
-SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\chwe tracker app files"
+SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\schwe tracker app files"
 TECH_FILE = os.path.join(SYNCED_FOLDER, "tech.json")
 
 # Ensure folder exists
@@ -245,26 +245,31 @@ def list_files_in_folder(folder):
         st.error(f"Failed to list files: {e}")
         return []
 
-# Helper to open folder cross-platform
+# Open folder button handler
 def open_folder(path):
     system_platform = platform.system()
-    # Optional debug message - comment out or remove in production
-    # st.write(f"Detected OS: {system_platform}")
+    st.write(f"Detected platform: {system_platform}")
+    st.write(f"Folder path: {path}")
+
+    if not os.path.exists(path):
+        st.error(f"Folder does not exist: {path}")
+        return
+
     try:
         if system_platform == "Windows":
             os.startfile(path)
-            st.success(f"Opened folder in Explorer: {path}")
+            st.success("Folder opened in Windows Explorer.")
         elif system_platform == "Darwin":  # macOS
             subprocess.run(["open", path])
-            st.success(f"Opened folder in Finder: {path}")
+            st.success("Folder opened in Finder.")
         elif system_platform == "Linux":
             try:
-                subprocess.run(["xdg-open", path])
-                st.success(f"Opened folder in File Manager: {path}")
+                subprocess.run(["xdg-open", path], check=True)
+                st.success("Folder opened in Linux file manager.")
             except FileNotFoundError:
-                st.warning(f"'xdg-open' not found. Please open the folder manually: {path}")
+                st.warning(f"'xdg-open' not found. Please open the folder manually:\n{path}")
         else:
-            st.warning(f"Opening folders not supported on {system_platform}. Please open manually: {path}")
+            st.warning(f"Unsupported OS: {system_platform}. Please open the folder manually:\n{path}")
     except Exception as e:
         st.error(f"Failed to open folder: {e}")
 
@@ -310,10 +315,7 @@ def main():
         st.markdown("### Files in Synced Folder")
 
         if st.button("Open Synced Folder in Explorer"):
-            if os.path.exists(SYNCED_FOLDER):
-                open_folder(SYNCED_FOLDER)
-            else:
-                st.error(f"Folder does not exist: {SYNCED_FOLDER}")
+            open_folder(SYNCED_FOLDER)
 
         files = list_files_in_folder(SYNCED_FOLDER)
         if not files:
