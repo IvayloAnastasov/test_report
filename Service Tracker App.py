@@ -1,12 +1,62 @@
 import streamlit as st
+import json
+import os
 from datetime import datetime, timedelta
 
 # ----------------------------
-# Initialize technician list in session_state
+# Constants
+# ----------------------------
+DATA_DIR = "data"
+TECH_FILE = os.path.join(DATA_DIR, "tech.json")
+
+# ----------------------------
+# Utility Functions for File I/O
+# ----------------------------
+
+def ensure_data_dir():
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+def save_tech_to_disk():
+    ensure_data_dir()
+    with open(TECH_FILE, "w") as f:
+        json.dump(st.session_state.tech, f, indent=4)
+
+def load_tech_from_disk():
+    if os.path.exists(TECH_FILE):
+        with open(TECH_FILE, "r") as f:
+            st.session_state.tech = json.load(f)
+    else:
+        st.session_state.tech = []
+
+def export_tech_file():
+    tech_data = json.dumps(st.session_state.tech, indent=4)
+    st.download_button(
+        label="📤 Export Technicians as JSON",
+        data=tech_data,
+        file_name="tech_export.json",
+        mime="application/json"
+    )
+
+def import_tech_file():
+    uploaded = st.file_uploader("📥 Import Technicians JSON File", type="json")
+    if uploaded:
+        try:
+            tech_data = json.load(uploaded)
+            if isinstance(tech_data, list):
+                st.session_state.tech = tech_data
+                save_tech_to_disk()
+                st.success("Technicians imported successfully.")
+            else:
+                st.error("Invalid file format. Expected a list.")
+        except Exception as e:
+            st.error(f"Failed to import: {e}")
+
+# ----------------------------
+# Initialize session state
 # ----------------------------
 
 if "tech" not in st.session_state:
-    st.session_state.tech = []  # Create the tech list if it doesn't exist
+    load_tech_from_disk()
 
 if "tasks" not in st.session_state:
     st.session_state.tasks = []
@@ -43,6 +93,7 @@ def add_technician_ui():
                 "phone": phone.strip(),
                 "email": email.strip()
             })
+            save_tech_to_disk()
             st.success(f"Added technician {name}")
             st.session_state["tech_name"] = ""
             st.session_state["tech_phone"] = ""
@@ -185,7 +236,7 @@ def report_ui():
 # ----------------------------
 
 def main():
-    st.title("Service Tracker")
+    st.title("🛠️ Service Tracker")
 
     menu = [
         "Home",
@@ -196,13 +247,14 @@ def main():
         "Mark Task Done",
         "Update Task",
         "Delete Task",
-        "Report Last 30 Days"
+        "Report Last 30 Days",
+        "Import/Export"
     ]
 
     if "selected_menu" not in st.session_state:
         st.session_state.selected_menu = "Home"
 
-    st.sidebar.title("Menu")
+    st.sidebar.title("📋 Menu")
     for item in menu:
         if st.sidebar.button(item):
             st.session_state.selected_menu = item
@@ -230,6 +282,11 @@ def main():
         delete_task_ui()
     elif choice == "Report Last 30 Days":
         report_ui()
+    elif choice == "Import/Export":
+        st.write("## Import Technicians")
+        import_tech_file()
+        st.write("## Export Technicians")
+        export_tech_file()
     else:
         st.write("Unknown option.")
 
