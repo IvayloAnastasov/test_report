@@ -3,19 +3,21 @@ import json
 import os
 from datetime import datetime, timedelta
 
+# Config
 SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\chwe tracker app files"
 TECH_FILE = os.path.join(SYNCED_FOLDER, "tech.json")
 
+# Ensure folder exists
+def ensure_synced_folder():
+    os.makedirs(SYNCED_FOLDER, exist_ok=True)
+
+# Ensure tech file exists
 def ensure_tech_file():
     if not os.path.exists(TECH_FILE):
         with open(TECH_FILE, "w") as f:
             json.dump([], f)
 
-
-# Make sure folder exists
-def ensure_synced_folder():
-    os.makedirs(SYNCED_FOLDER, exist_ok=True)
-
+# Load technicians from disk
 def load_tech_from_disk():
     try:
         with open(TECH_FILE, "r") as f:
@@ -26,18 +28,20 @@ def load_tech_from_disk():
         st.error(f"Failed to load technician list: {e}")
         return []
 
+# Save technicians to disk
 def save_tech_to_disk(tech_list):
     ensure_synced_folder()
     with open(TECH_FILE, "w") as f:
         json.dump(tech_list, f, indent=4)
 
+# Get tech name by id
 def get_technician_name(technicians, tech_id):
     for t in technicians:
         if t["id"] == tech_id:
             return t["name"]
     return "Unknown"
 
-# -- UI to Add Technician --
+# UI: Add technician
 def add_technician_ui():
     st.subheader("Add Technician")
     name = st.text_input("Name", key="tech_name")
@@ -48,19 +52,15 @@ def add_technician_ui():
         if not name.strip():
             st.warning("Name is required")
         else:
-            # Load existing technicians from disk
-            techs = load_tech_from_disk()
+            techs = st.session_state.tech
 
-            # Check if technician with same name exists
             existing_tech = next((t for t in techs if t["name"].lower() == name.strip().lower()), None)
 
             if existing_tech:
-                # Update existing technician info
                 existing_tech["phone"] = phone.strip()
                 existing_tech["email"] = email.strip()
-                st.success(f"Updated technician '{name}'")
+                st.success(f"Updated technician '{name.strip()}'")
             else:
-                # Add new technician with new id
                 new_id = 1 + max([t["id"] for t in techs], default=0)
                 techs.append({
                     "id": new_id,
@@ -68,12 +68,9 @@ def add_technician_ui():
                     "phone": phone.strip(),
                     "email": email.strip()
                 })
-                st.success(f"Added technician '{name}'")
+                st.success(f"Added technician '{name.strip()}'")
 
-            # Save updated list back to disk
             save_tech_to_disk(techs)
-
-            # Update session state
             st.session_state.tech = techs
 
             # Clear inputs
@@ -81,33 +78,34 @@ def add_technician_ui():
             st.session_state["tech_phone"] = ""
             st.session_state["tech_email"] = ""
 
-# -- UI to List Technicians --
+# UI: List technicians
 def list_technicians_ui():
     st.subheader("Technicians")
-    techs = load_tech_from_disk()
+    techs = st.session_state.tech
     if not techs:
         st.write("No technicians yet.")
     else:
         for t in techs:
             st.write(f"ID {t['id']}: {t['name']} | Phone: {t['phone']} | Email: {t['email']}")
 
-# Task list is kept in-memory only here
+# Initialize tasks in session state
 if "tasks" not in st.session_state:
     st.session_state.tasks = []
 
+# UI: Add task
 def add_task_ui():
     st.subheader("Add Task")
-    techs = load_tech_from_disk()
+    techs = st.session_state.tech
     if not techs:
         st.warning("Add a technician first.")
         return
 
     tasks = st.session_state.tasks
 
-    # Technician selection
     tech_options = {t["name"]: t["id"] for t in techs}
     selected_tech = st.selectbox("Assign to Technician", options=list(tech_options.keys()), key="task_tech")
     description = st.text_input("Task Description", key="task_desc")
+
     if st.button("Add Task"):
         if not description.strip():
             st.warning("Description is required.")
@@ -121,13 +119,14 @@ def add_task_ui():
                 "done": False,
                 "completed_at": None
             })
-            st.success(f"Task added: {description}")
+            st.success(f"Task added: {description.strip()}")
             st.session_state["task_desc"] = ""
 
+# UI: List tasks
 def list_tasks_ui(show_all=True):
     st.subheader("Tasks")
     tasks = st.session_state.tasks
-    techs = load_tech_from_disk()
+    techs = st.session_state.tech
     if not tasks:
         st.write("No tasks yet.")
         return
@@ -140,6 +139,7 @@ def list_tasks_ui(show_all=True):
         line = f"ID {task['id']}: {task['description']} (Tech: {tech_name}) — Created: {created} — Status: {status}"
         st.write(line)
 
+# UI: Mark task done
 def mark_task_done_ui():
     st.subheader("Mark Task as Done")
     tasks = st.session_state.tasks
@@ -147,7 +147,7 @@ def mark_task_done_ui():
     if not pending_tasks:
         st.write("No pending tasks.")
         return
-    options = { f"ID {t['id']}: {t['description']}" : t["id"] for t in pending_tasks }
+    options = {f"ID {t['id']}: {t['description']}": t["id"] for t in pending_tasks}
     sel = st.selectbox("Select task to mark done", options=list(options.keys()), key="task_done_sel")
     if st.button("Mark as Done"):
         task_id = options[sel]
@@ -158,13 +158,14 @@ def mark_task_done_ui():
                 st.success(f"Task ID {task_id} marked done.")
                 break
 
+# UI: Update task description
 def update_task_ui():
     st.subheader("Update Task Description")
     tasks = st.session_state.tasks
     if not tasks:
         st.write("No tasks yet.")
         return
-    options = { f"ID {t['id']}: {t['description']}" : t["id"] for t in tasks }
+    options = {f"ID {t['id']}: {t['description']}": t["id"] for t in tasks}
     sel = st.selectbox("Select task to update", options=list(options.keys()), key="task_update_sel")
     new_desc = st.text_input("New description", key="task_update_desc")
     if st.button("Update Task"):
@@ -179,23 +180,25 @@ def update_task_ui():
                     st.session_state["task_update_desc"] = ""
                     break
 
+# UI: Delete task
 def delete_task_ui():
     st.subheader("Delete Task")
     tasks = st.session_state.tasks
     if not tasks:
         st.write("No tasks to delete.")
         return
-    options = { f"ID {t['id']}: {t['description']}" : t["id"] for t in tasks }
+    options = {f"ID {t['id']}: {t['description']}": t["id"] for t in tasks}
     sel = st.selectbox("Select task to delete", options=list(options.keys()), key="task_delete_sel")
     if st.button("Delete Task"):
         task_id = options[sel]
         tasks[:] = [t for t in tasks if t["id"] != task_id]
         st.success(f"Task ID {task_id} deleted.")
 
+# UI: Report last 30 days tasks
 def report_ui():
     st.subheader("Report: Tasks Completed in Last 30 Days")
     tasks = st.session_state.tasks
-    techs = load_tech_from_disk()
+    techs = st.session_state.tech
     cutoff = datetime.now() - timedelta(days=30)
     done_tasks = []
     for t in tasks:
@@ -211,6 +214,7 @@ def report_ui():
             comp = datetime.fromisoformat(t["completed_at"]).strftime("%Y-%m-%d")
             st.write(f"ID {t['id']}: {t['description']} — Tech: {tech_name} — Completed: {comp}")
 
+# UI: Import technicians
 def import_technicians_ui():
     st.subheader("Import Technicians JSON")
     uploaded_file = st.file_uploader("Upload JSON file", type=["json"])
@@ -226,9 +230,10 @@ def import_technicians_ui():
         except Exception as e:
             st.error(f"Failed to import: {e}")
 
+# UI: Export technicians
 def export_technicians_ui():
     st.subheader("Export Technicians JSON")
-    techs = load_tech_from_disk()
+    techs = st.session_state.tech
     if techs:
         st.download_button("Download technicians JSON", json.dumps(techs, indent=4), file_name="tech.json")
     else:
@@ -237,10 +242,10 @@ def export_technicians_ui():
 def main():
     st.title("Service Tracker")
 
-    ensure_tech_file()
     ensure_synced_folder()
+    ensure_tech_file()
 
-    # Load tech list into session state on startup or refresh
+    # Load tech list into session state only once
     if "tech" not in st.session_state:
         st.session_state.tech = load_tech_from_disk()
 
@@ -262,9 +267,8 @@ def main():
         st.session_state.selected_menu = "Home"
 
     st.sidebar.title("Menu")
-    for item in menu:
-        if st.sidebar.button(item):
-            st.session_state.selected_menu = item
+    selected = st.sidebar.radio("Navigate", menu, index=menu.index(st.session_state.selected_menu))
+    st.session_state.selected_menu = selected
 
     choice = st.session_state.selected_menu
     st.subheader(choice)
