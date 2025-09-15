@@ -1,83 +1,61 @@
 import streamlit as st
-import json
 from datetime import datetime, timedelta
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
-# ---- Add these imports for Google Sheets ----
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+# --------------------- CONFIG ---------------------
+SHEET_ID = "your_google_sheet_id_here"  # 🔧 Replace with your Google Sheet ID
+SHEET_NAME = "Sheet1"                   # 🔧 Sheet/tab name
 
-# ---------------------- CONFIGURATION ----------------------
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# These are values you must set / fill in:
-SHEET_NAME = "Your Google Sheet Name Here"  # <-- your sheet title
-WORKSHEET_NAME = "Sheet1"  # <-- if you have multiple sheets/worksheets
-# If using .secrets in streamlit, put the service account JSON here:
-# e.g. in .streamlit/secrets.toml:
-# [google_service_account]
-# type = "service_account"
-# project_id = "..."
-# private_key_id = "..."
-# private_key = """-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"""
-# client_email = "..."
-# client_id = "..."
-# auth_uri = "..."
-# token_uri = "..."
-# etc.
+def get_sheets_service():
+    creds = Credentials.from_service_account_info(
+        st.secrets["google_service_account"], scopes=SCOPES
+    )
+    return build("sheets", "v4", credentials=creds).spreadsheets()
 
-# The scope of permissions for the Google APIs
-GSCPREAD_SCOPE = [
-    "https://spreadsheets.google.com/feeds", 
-    "https://www.googleapis.com/auth/drive"
-]
-
-# ---------------------- GOOGLE SHEETS FUNCTIONS ----------------------
-
-def get_gsheet_client():
-    """Authorize and return a gspread client using service account credentials."""
-    creds_dict = st.secrets["google_service_account"]  # <-- ensure you have this in secrets
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, GSCPREAD_SCOPE)
-    client = gspread.authorize(creds)
-    return client
-
-def get_worksheet():
-    """Return the worksheet object where tasks will be stored."""
-    client = get_gsheet_client()
-    # Open the Google Sheet by name
-    sht = client.open(SHEET_NAME)
-    # Select the worksheet/tab
-    ws = sht.worksheet(WORKSHEET_NAME)
-    return ws
+# --------------------- SHEET FUNCTIONS ---------------------
 
 def append_task_to_sheet(task, tech_name):
-    """Append a row for a newly added task."""
-    ws = get_worksheet()
-    row = [
+    service = get_sheets_service()
+    values = [[
         task["id"],
         tech_name,
         task["description"],
         task["created_at"],
-        "Pending",           # status when added
-        ""                   # no completed date yet
-    ]
-    ws.append_row(row)
+        "Pending",
+        ""
+    ]]
+    body = {"values": values}
+    service.values().append(
+        spreadsheetId=SHEET_ID,
+        range=f"{SHEET_NAME}!A1",
+        valueInputOption="USER_ENTERED",
+        insertDataOption="INSERT_ROWS",
+        body=body
+    ).execute()
 
 def update_task_status_in_sheet(task_id, completed_at):
-    """
-    Find the row with this task_id and update status + completed_at.
-    Assumes first row is headers, and columns are:
-    ID | Technician | Description | Created At | Status | Completed At
-    """
-    ws = get_worksheet()
-    all_records = ws.get_all_records()  # returns list of dicts mapping headers to values
-    # Find which row number, starting from 2 because row 1 is headers
-    for idx, rec in enumerate(all_records, start=2):
-        if str(rec.get("ID")) == str(task_id):
-            # Column 5 = Status; Column 6 = Completed At
-            ws.update_cell(idx, 5, "Done")
-            ws.update_cell(idx, 6, completed_at)
+    service = get_sheets_service()
+    result = service.values().get(
+        spreadsheetId=SHEET_ID,
+        range=f"{SHEET_NAME}!A2:F"
+    ).execute()
+
+    rows = result.get("values", [])
+    for i, row in enumerate(rows):
+        if str(row[0]) == str(task_id):
+            row_number = i + 2
+            service.values().update(
+                spreadsheetId=SHEET_ID,
+                range=f"{SHEET_NAME}!E{row_number}:F{row_number}",
+                valueInputOption="USER_ENTERED",
+                body={"values": [["Done", completed_at]]}
+            ).execute()
             break
 
-# ---------------------- TASK MANAGEMENT ----------------------
+# --------------------- UI & LOGIC ---------------------
 
 def get_technician_name(technicians, tech_id):
     for t in technicians:
@@ -88,42 +66,24 @@ def get_technician_name(technicians, tech_id):
 def add_technician_ui():
     st.subheader("Add Technician")
     name = st.text_input("Name", key="tech_name")
-    phone = st.text_input("Phone", key="tech_phone")
-    email = st.text_input("Email", key="tech_email")
-
     if st.button("Add Technician"):
         if not name.strip():
             st.warning("Name is required")
         else:
             techs = st.session_state.tech
-            existing_tech = next((t for t in techs if t["name"].lower() == name.strip().lower()), None)
-            if existing_tech:
-                existing_tech["phone"] = phone.strip()
-                existing_tech["email"] = email.strip()
-                st.success(f"Updated technician '{name.strip()}'")
-            else:
+            existing = next((t for t in techs if t["name"].lower() == name.lower()), None)
+            if not existing:
                 new_id = 1 + max([t["id"] for t in techs], default=0)
-                techs.append({
-                    "id": new_id,
-                    "name": name.strip(),
-                    "phone": phone.strip(),
-                    "email": email.strip()
-                })
-                st.success(f"Added technician '{name.strip()}'")
-            # Note: Technicians are not synced to Google Sheet in this version
-            st.session_state.tech = techs
-            st.session_state["tech_name"] = ""
-            st.session_state["tech_phone"] = ""
-            st.session_state["tech_email"] = ""
+                techs.append({"id": new_id, "name": name.strip()})
+                st.success(f"Added technician '{name}'")
+                st.session_state.tech = techs
+            else:
+                st.warning("Technician already exists")
 
 def list_technicians_ui():
     st.subheader("Technicians")
-    techs = st.session_state.tech
-    if not techs:
-        st.write("No technicians yet.")
-    else:
-        for t in techs:
-            st.write(f"ID {t['id']}: {t['name']} | Phone: {t['phone']} | Email: {t['email']}")
+    for t in st.session_state.tech:
+        st.write(f"{t['id']}: {t['name']}")
 
 def add_task_ui():
     st.subheader("Add Task")
@@ -131,86 +91,72 @@ def add_task_ui():
     if not techs:
         st.warning("Add a technician first.")
         return
-    tasks = st.session_state.tasks
-    tech_options = {t["name"]: t["id"] for t in techs}
-    selected_tech = st.selectbox("Assign to Technician", list(tech_options.keys()), key="task_tech")
-    description = st.text_input("Task Description", key="task_desc")
+
+    tech_map = {t["name"]: t["id"] for t in techs}
+    tech_name = st.selectbox("Assign to", list(tech_map.keys()))
+    description = st.text_input("Task Description")
 
     if st.button("Add Task"):
         if not description.strip():
-            st.warning("Description is required.")
+            st.warning("Description required.")
         else:
+            tasks = st.session_state.tasks
             new_id = 1 + max([t["id"] for t in tasks], default=0)
             task = {
                 "id": new_id,
-                "technician_id": tech_options[selected_tech],
+                "technician_id": tech_map[tech_name],
                 "description": description.strip(),
                 "created_at": datetime.now().isoformat(),
                 "done": False,
                 "completed_at": None
             }
             tasks.append(task)
-            st.success(f"Task added: {description.strip()}")
-            st.session_state["task_desc"] = ""
+            st.session_state.tasks = tasks
+            st.success("Task added.")
 
-            # ---- HERE: after you add task, append to Google Sheet ----
-            tech_name = get_technician_name(techs, task["technician_id"])
+            # 🔄 Sync to Google Sheet
             append_task_to_sheet(task, tech_name)
 
-def list_tasks_ui(show_all=True):
-    st.subheader("Tasks")
-    tasks = st.session_state.tasks
-    techs = st.session_state.tech
-    if not tasks:
-        st.write("No tasks yet.")
-        return
-    for task in tasks:
-        if not show_all and task["done"]:
-            continue
-        status = "✅ Done" if task["done"] else "❗ Pending"
-        tech_name = get_technician_name(techs, task["technician_id"])
-        created = datetime.fromisoformat(task["created_at"]).strftime("%Y-%m-%d")
-        st.write(f"ID {task['id']}: {task['description']} (Tech: {tech_name}) — Created: {created} — Status: {status}")
+def list_tasks_ui():
+    st.subheader("All Tasks")
+    for t in st.session_state.tasks:
+        tech = get_technician_name(st.session_state.tech, t["technician_id"])
+        status = "✅ Done" if t["done"] else "❗ Pending"
+        st.write(f"ID {t['id']}: {t['description']} - {tech} - {status}")
 
 def mark_task_done_ui():
     st.subheader("Mark Task as Done")
-    tasks = st.session_state.tasks
-    pending_tasks = [t for t in tasks if not t["done"]]
-    if not pending_tasks:
-        st.write("No pending tasks.")
+    tasks = [t for t in st.session_state.tasks if not t["done"]]
+    if not tasks:
+        st.info("No pending tasks.")
         return
-    options = {f"ID {t['id']}: {t['description']}": t["id"] for t in pending_tasks}
-    sel = st.selectbox("Select task to mark done", list(options.keys()), key="task_done_sel")
-    if st.button("Mark as Done"):
-        task_id = options[sel]
-        for t in tasks:
+
+    task_map = {f"ID {t['id']}: {t['description']}": t["id"] for t in tasks}
+    selection = st.selectbox("Select task", list(task_map.keys()))
+    if st.button("Mark Done"):
+        task_id = task_map[selection]
+        for t in st.session_state.tasks:
             if t["id"] == task_id:
                 t["done"] = True
                 t["completed_at"] = datetime.now().isoformat()
-                st.success(f"Task ID {task_id} marked done.")
-                # ---- HERE: update Google Sheet for status/completed date ----
                 update_task_status_in_sheet(task_id, t["completed_at"])
+                st.success(f"Marked task {task_id} as done.")
                 break
 
 def report_ui():
-    st.subheader("Report: Tasks Completed in Last 30 Days")
-    tasks = st.session_state.tasks
-    techs = st.session_state.tech
+    st.subheader("Tasks Completed (Last 30 Days)")
     cutoff = datetime.now() - timedelta(days=30)
-    done_tasks = [t for t in tasks if t["done"] and t.get("completed_at") and datetime.fromisoformat(t["completed_at"]) >= cutoff]
-    if not done_tasks:
-        st.write("No tasks completed in last 30 days.")
-    else:
-        for t in done_tasks:
-            tech_name = get_technician_name(techs, t["technician_id"])
-            comp = datetime.fromisoformat(t["completed_at"]).strftime("%Y-%m-%d")
-            st.write(f"ID {t['id']}: {t['description']} — Tech: {tech_name} — Completed: {comp}")
+    for t in st.session_state.tasks:
+        if t["done"] and t["completed_at"]:
+            done_date = datetime.fromisoformat(t["completed_at"])
+            if done_date >= cutoff:
+                tech = get_technician_name(st.session_state.tech, t["technician_id"])
+                st.write(f"{t['description']} - {tech} ✅ {done_date.strftime('%Y-%m-%d')}")
 
-def list_files_ui():  # optional, if you had files to list
-    pass  # removed local file operations
+# --------------------- MAIN ---------------------
 
 def main():
-    st.title("Service Tracker with Google Sheets Sync")
+    st.title("Service Tracker App (Google Sheets Sync)")
 
     if "tech" not in st.session_state:
         st.session_state.tech = []
@@ -224,30 +170,24 @@ def main():
         "Add Task",
         "List Tasks",
         "Mark Task Done",
-        "Report Last 30 Days",
+        "Completed Tasks Report"
     ]
 
-    st.sidebar.title("Menu")
-    selected = st.sidebar.radio("Navigate", menu)
-    st.subheader(selected)
-
-    if selected == "Home":
-        st.write("Welcome to the Service Tracker App!")
-    elif selected == "Add Technician":
+    choice = st.sidebar.radio("Menu", menu)
+    if choice == "Home":
+        st.write("Welcome to the Google Sheets-Connected Task Tracker.")
+    elif choice == "Add Technician":
         add_technician_ui()
-    elif selected == "List Technicians":
+    elif choice == "List Technicians":
         list_technicians_ui()
-    elif selected == "Add Task":
+    elif choice == "Add Task":
         add_task_ui()
-    elif selected == "List Tasks":
-        show_all = st.checkbox("Show all (including done)", value=True, key="show_all_tasks")
-        list_tasks_ui(show_all=show_all)
-    elif selected == "Mark Task Done":
+    elif choice == "List Tasks":
+        list_tasks_ui()
+    elif choice == "Mark Task Done":
         mark_task_done_ui()
-    elif selected == "Report Last 30 Days":
+    elif choice == "Completed Tasks Report":
         report_ui()
-    else:
-        st.write("Unknown option.")
 
 if __name__ == "__main__":
     main()
