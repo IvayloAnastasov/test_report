@@ -16,6 +16,12 @@ def ensure_tech_file():
     if not os.path.exists(TECH_FILE):
         with open(TECH_FILE, "w") as f:
             json.dump([], f)
+def list_files_in_folder(folder):
+    try:
+        return sorted([f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))])
+    except Exception as e:
+        st.error(f"Failed to list files: {e}")
+        return []
 
 # Load technicians from disk
 def load_tech_from_disk():
@@ -274,7 +280,16 @@ def main():
     st.subheader(choice)
 
     if choice == "Home":
-        st.write("Welcome to the Service Tracker App!")
+    st.write("Welcome to the Service Tracker App!")
+    st.markdown("### Files in Synced Folder")
+
+    files = list_files_in_folder(SYNCED_FOLDER)
+    if not files:
+        st.info("No files found in the synced folder.")
+    else:
+        for file in files:
+            st.write(f"- {file}")
+
     elif choice == "Add Technician":
         add_technician_ui()
     elif choice == "List Technicians":
