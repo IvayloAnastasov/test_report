@@ -243,14 +243,13 @@ def list_files_in_folder(folder):
         st.error(f"Failed to list files: {e}")
         return []
 
-# Main function
+# MAIN FUNCTION
 def main():
     st.title("Service Tracker")
 
     ensure_synced_folder()
     ensure_tech_file()
 
-    # Load tech list into session state only once
     if "tech" not in st.session_state:
         st.session_state.tech = load_tech_from_disk()
 
@@ -284,6 +283,13 @@ def main():
     if choice == "Home":
         st.write("Welcome to the Service Tracker App!")
         st.markdown("### Files in Synced Folder")
+
+        # Button to open folder in Windows Explorer
+        if st.button("Open Synced Folder in Explorer"):
+            try:
+                os.startfile(SYNCED_FOLDER)
+            except Exception as e:
+                st.error(f"Failed to open folder: {e}")
 
         files = list_files_in_folder(SYNCED_FOLDER)
         if not files:
