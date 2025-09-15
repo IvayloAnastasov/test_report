@@ -3,9 +3,9 @@ import json
 import os
 from datetime import datetime, timedelta
 
-# === Set your synced folder path here (OneDrive / Google Drive synced folder) ===
 SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\chwe tracker app files"
 TECH_FILE = os.path.join(SYNCED_FOLDER, "tech.json")
+
 
 # Make sure folder exists
 def ensure_synced_folder():
