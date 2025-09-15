@@ -1,16 +1,8 @@
 [
     {
         "id": 1,
-        "name": "Marco",
+        "name": "new",
         "phone": "",
-        "email": "MCHO@enabl.dk"
-    }
-    ,
-    
-    {
-        "id": 2,
-        "name": "Ivaylo",
-        "phone": "",
-        "email": "IA@enabl.dk"
+        "email": ""
     }
 ]
