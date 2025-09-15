@@ -12,7 +12,7 @@ SPREADSHEET_ID = "1tTjNIHuwQ0PcsfK2Si7IjLP_S0ZeJLmo7C1yMyGqw18"  # your Google S
 WORKSHEET_NAME = "Sheet1"  # tab name
 
 # Github URL for technicians JSON
-TECH_GITHUB_URL = "https://raw.githubusercontent.com/IvayloAnastasov/test_report/refs/heads/main/tech.json"  
+TECH_GITHUB_URL = "https://raw.githubusercontent.com/IvayloAnastasov/test_report/refs/heads/main/tech_update.json"  
 # 🔧 Replace the above with your actual raw URL
 
 # Google Sheets scopes
