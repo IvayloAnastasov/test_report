@@ -1,8 +1,15 @@
 [
     {
         "id": 1,
-        "name": "new",
+        "name": "Marco",
+        "phone": "",
+        "email": ""
+    },
+    {
+        "id": 2,
+        "name": "Ivaylo",
         "phone": "",
         "email": ""
     }
+    
 ]
