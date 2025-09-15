@@ -2,11 +2,11 @@ import streamlit as st
 from datetime import datetime, timedelta
 
 # ----------------------------
-# Initialize in-memory storage
+# Initialize technician list in session_state
 # ----------------------------
 
-if "technicians" not in st.session_state:
-    st.session_state.technicians = []
+if "tech" not in st.session_state:
+    st.session_state.tech = []  # Create the tech list if it doesn't exist
 
 if "tasks" not in st.session_state:
     st.session_state.tasks = []
@@ -35,7 +35,7 @@ def add_technician_ui():
         if not name.strip():
             st.warning("Name is required")
         else:
-            techs = st.session_state.technicians
+            techs = st.session_state.tech
             new_id = 1 + max([t["id"] for t in techs], default=0)
             techs.append({
                 "id": new_id,
@@ -50,7 +50,7 @@ def add_technician_ui():
 
 def list_technicians_ui():
     st.subheader("Technicians")
-    techs = st.session_state.technicians
+    techs = st.session_state.tech
     if not techs:
         st.write("No technicians yet.")
     else:
@@ -59,7 +59,7 @@ def list_technicians_ui():
 
 def add_task_ui():
     st.subheader("Add Task")
-    techs = st.session_state.technicians
+    techs = st.session_state.tech
     tasks = st.session_state.tasks
 
     if not techs:
@@ -89,7 +89,7 @@ def add_task_ui():
 def list_tasks_ui(show_all=True):
     st.subheader("Tasks")
     tasks = st.session_state.tasks
-    techs = st.session_state.technicians
+    techs = st.session_state.tech
 
     if not tasks:
         st.write("No tasks yet.")
@@ -167,7 +167,7 @@ def delete_task_ui():
 def report_ui():
     st.subheader("Report: Tasks Completed in Last 30 Days")
     tasks = st.session_state.tasks
-    techs = st.session_state.technicians
+    techs = st.session_state.tech
     cutoff = datetime.now() - timedelta(days=30)
 
     done_tasks = [t for t in tasks if t["done"] and t.get("completed_at") and datetime.fromisoformat(t["completed_at"]) >= cutoff]
