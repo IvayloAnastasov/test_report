@@ -2,26 +2,17 @@ import streamlit as st
 import json
 from datetime import datetime, timedelta
 
-# ---- Add these imports for Google Sheets ----
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 # ---------------------- CONFIGURATION ----------------------
 
-#SPREADSHEET_ID = "1tTjNIHuwQ0PcsfK2Si7IjLP_S0ZeJLmo7C1yMyGqw18"  # 🔧 your sheet ID
-SHEET_NAME = "Sheet1"  # 🔧 tab name, change if different
+SPREADSHEET_ID = "1tTjNIHuwQ0PcsfK2Si7IjLP_S0ZeJLmo7C1yMyGqw18"  # 🔧 your sheet ID
+WORKSHEET_NAME = "Sheet1"  # 🔧 tab name, change if different
 
 # Scopes needed for gspread / Google Sheets & Drive
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-
-
-
-# The scope of permissions for the Google APIs
-GSCPREAD_SCOPE = [
-    "https://spreadsheets.google.com/feeds", 
     "https://www.googleapis.com/auth/drive"
 ]
 
@@ -30,17 +21,17 @@ GSCPREAD_SCOPE = [
 def get_gsheet_client():
     """Authorize and return a gspread client using service account credentials."""
     creds_dict = st.secrets["google_service_account"]  # <-- ensure you have this in secrets
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, GSCPREAD_SCOPE)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPES)
     client = gspread.authorize(creds)
     return client
 
 def get_worksheet():
     """Return the worksheet object where tasks will be stored."""
     client = get_gsheet_client()
-    # Open the Google Sheet by name
-    sht = client.open(SHEET_NAME)
+    # Open the Google Sheet by its ID
+    sh = client.open_by_key(SPREADSHEET_ID)
     # Select the worksheet/tab
-    ws = sht.worksheet(WORKSHEET_NAME)
+    ws = sh.worksheet(WORKSHEET_NAME)
     return ws
 
 def append_task_to_sheet(task, tech_name):
@@ -54,7 +45,7 @@ def append_task_to_sheet(task, tech_name):
         "Pending",           # status when added
         ""                   # no completed date yet
     ]
-    ws.append_row(row)
+    ws.append_row(row, value_input_option='USER_ENTERED')
 
 def update_task_status_in_sheet(task_id, completed_at):
     """
@@ -66,10 +57,10 @@ def update_task_status_in_sheet(task_id, completed_at):
     all_records = ws.get_all_records()  # returns list of dicts mapping headers to values
     # Find which row number, starting from 2 because row 1 is headers
     for idx, rec in enumerate(all_records, start=2):
+        # rec["ID"] if your header is "ID", case sensitive
         if str(rec.get("ID")) == str(task_id):
-            # Column 5 = Status; Column 6 = Completed At
-            ws.update_cell(idx, 5, "Done")
-            ws.update_cell(idx, 6, completed_at)
+            ws.update_cell(idx, 5, "Done")           # Column E = Status
+            ws.update_cell(idx, 6, completed_at)     # Column F = Completed At
             break
 
 # ---------------------- TASK MANAGEMENT ----------------------
@@ -105,7 +96,6 @@ def add_technician_ui():
                     "email": email.strip()
                 })
                 st.success(f"Added technician '{name.strip()}'")
-            # Note: Technicians are not synced to Google Sheet in this version
             st.session_state.tech = techs
             st.session_state["tech_name"] = ""
             st.session_state["tech_phone"] = ""
@@ -118,7 +108,7 @@ def list_technicians_ui():
         st.write("No technicians yet.")
     else:
         for t in techs:
-            st.write(f"ID {t['id']}: {t['name']} | Phone: {t['phone']} | Email: {t['email']}")
+            st.write(f"ID {t['id']}: {t['name']} | Phone: {t.get('phone','')} | Email: {t.get('email','')}")
 
 def add_task_ui():
     st.subheader("Add Task")
@@ -145,6 +135,7 @@ def add_task_ui():
                 "completed_at": None
             }
             tasks.append(task)
+            st.session_state.tasks = tasks
             st.success(f"Task added: {description.strip()}")
             st.session_state["task_desc"] = ""
 
@@ -182,6 +173,7 @@ def mark_task_done_ui():
             if t["id"] == task_id:
                 t["done"] = True
                 t["completed_at"] = datetime.now().isoformat()
+                st.session_state.tasks = tasks
                 st.success(f"Task ID {task_id} marked done.")
                 # ---- HERE: update Google Sheet for status/completed date ----
                 update_task_status_in_sheet(task_id, t["completed_at"])
@@ -200,9 +192,6 @@ def report_ui():
             tech_name = get_technician_name(techs, t["technician_id"])
             comp = datetime.fromisoformat(t["completed_at"]).strftime("%Y-%m-%d")
             st.write(f"ID {t['id']}: {t['description']} — Tech: {tech_name} — Completed: {comp}")
-
-def list_files_ui():  # optional, if you had files to list
-    pass  # removed local file operations
 
 def main():
     st.title("Service Tracker with Google Sheets Sync")
