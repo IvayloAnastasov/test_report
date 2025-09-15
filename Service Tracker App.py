@@ -5,10 +5,10 @@ from datetime import datetime, timedelta
 import subprocess
 import platform
 
-
 # Config
 SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\schwe tracker app files"
 TECH_FILE = os.path.join(SYNCED_FOLDER, "tech.json")
+TASK_FILE = os.path.join(SYNCED_FOLDER, "tasks.json")  # Added task persistence
 
 # Ensure folder exists
 def ensure_synced_folder():
@@ -20,13 +20,17 @@ def ensure_tech_file():
         with open(TECH_FILE, "w") as f:
             json.dump([], f)
 
+# Ensure tasks file exists
+def ensure_task_file():
+    if not os.path.exists(TASK_FILE):
+        with open(TASK_FILE, "w") as f:
+            json.dump([], f)
+
 # Load technicians from disk
 def load_tech_from_disk():
     try:
         with open(TECH_FILE, "r") as f:
             return json.load(f)
-    except FileNotFoundError:
-        return []
     except Exception as e:
         st.error(f"Failed to load technician list: {e}")
         return []
@@ -36,6 +40,21 @@ def save_tech_to_disk(tech_list):
     ensure_synced_folder()
     with open(TECH_FILE, "w") as f:
         json.dump(tech_list, f, indent=4)
+
+# Load tasks from disk
+def load_tasks_from_disk():
+    try:
+        with open(TASK_FILE, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        st.error(f"Failed to load tasks: {e}")
+        return []
+
+# Save tasks to disk
+def save_tasks_to_disk(task_list):
+    ensure_synced_folder()
+    with open(TASK_FILE, "w") as f:
+        json.dump(task_list, f, indent=4)
 
 # Get tech name by id
 def get_technician_name(technicians, tech_id):
@@ -56,7 +75,6 @@ def add_technician_ui():
             st.warning("Name is required")
         else:
             techs = st.session_state.tech
-
             existing_tech = next((t for t in techs if t["name"].lower() == name.strip().lower()), None)
 
             if existing_tech:
@@ -121,6 +139,9 @@ def add_task_ui():
             st.success(f"Task added: {description.strip()}")
             st.session_state["task_desc"] = ""
 
+            save_tasks_to_disk(tasks)
+            st.session_state.tasks = tasks
+
 # UI: List tasks
 def list_tasks_ui(show_all=True):
     st.subheader("Tasks")
@@ -134,7 +155,10 @@ def list_tasks_ui(show_all=True):
             continue
         status = "✅ Done" if task["done"] else "❗ Pending"
         tech_name = get_technician_name(techs, task["technician_id"])
-        created = datetime.fromisoformat(task["created_at"]).strftime("%Y-%m-%d")
+        try:
+            created = datetime.fromisoformat(task["created_at"]).strftime("%Y-%m-%d")
+        except Exception:
+            created = "Unknown"
         line = f"ID {task['id']}: {task['description']} (Tech: {tech_name}) — Created: {created} — Status: {status}"
         st.write(line)
 
@@ -156,6 +180,9 @@ def mark_task_done_ui():
                 t["completed_at"] = datetime.now().isoformat()
                 st.success(f"Task ID {task_id} marked done.")
                 break
+
+        save_tasks_to_disk(tasks)
+        st.session_state.tasks = tasks
 
 # UI: Update task description
 def update_task_ui():
@@ -179,6 +206,9 @@ def update_task_ui():
                     st.session_state["task_update_desc"] = ""
                     break
 
+            save_tasks_to_disk(tasks)
+            st.session_state.tasks = tasks
+
 # UI: Delete task
 def delete_task_ui():
     st.subheader("Delete Task")
@@ -193,6 +223,9 @@ def delete_task_ui():
         tasks[:] = [t for t in tasks if t["id"] != task_id]
         st.success(f"Task ID {task_id} deleted.")
 
+        save_tasks_to_disk(tasks)
+        st.session_state.tasks = tasks
+
 # UI: Report last 30 days tasks
 def report_ui():
     st.subheader("Report: Tasks Completed in Last 30 Days")
@@ -202,9 +235,12 @@ def report_ui():
     done_tasks = []
     for t in tasks:
         if t["done"] and t.get("completed_at"):
-            comp = datetime.fromisoformat(t["completed_at"])
-            if comp >= cutoff:
-                done_tasks.append(t)
+            try:
+                comp = datetime.fromisoformat(t["completed_at"])
+                if comp >= cutoff:
+                    done_tasks.append(t)
+            except Exception:
+                continue
     if not done_tasks:
         st.write("No tasks completed in last 30 days.")
     else:
@@ -252,12 +288,13 @@ def main():
 
     ensure_synced_folder()
     ensure_tech_file()
+    ensure_task_file()
 
     if "tech" not in st.session_state:
         st.session_state.tech = load_tech_from_disk()
 
     if "tasks" not in st.session_state:
-        st.session_state.tasks = []
+        st.session_state.tasks = load_tasks_from_disk()
 
     menu = [
         "Home",
@@ -287,26 +324,19 @@ def main():
         st.write("Welcome to the Service Tracker App!")
         st.markdown("### Files in Synced Folder")
 
-        # Button to open folder in Windows Explorer
-        import subprocess
-import platform
-
-# ...
-
-if st.button("Open Synced Folder in Explorer"):
-    try:
-        system_platform = platform.system()
-        if system_platform == "Windows":
-            os.startfile(SYNCED_FOLDER)
-        elif system_platform == "Darwin":  # macOS
-            subprocess.run(["open", SYNCED_FOLDER])
-        elif system_platform == "Linux":
-            subprocess.run(["xdg-open", SYNCED_FOLDER])
-        else:
-            st.warning(f"Opening folders not supported on {system_platform}.")
-    except Exception as e:
-        st.error(f"Failed to open folder: {e}")
-
+        if st.button("Open Synced Folder in Explorer"):
+            try:
+                system_platform = platform.system()
+                if system_platform == "Windows":
+                    os.startfile(SYNCED_FOLDER)
+                elif system_platform == "Darwin":  # macOS
+                    subprocess.run(["open", SYNCED_FOLDER])
+                elif system_platform == "Linux":
+                    subprocess.run(["xdg-open", SYNCED_FOLDER])
+                else:
+                    st.warning(f"Opening folders not supported on {system_platform}.")
+            except Exception as e:
+                st.error(f"Failed to open folder: {e}")
 
         files = list_files_in_folder(SYNCED_FOLDER)
         if not files:
