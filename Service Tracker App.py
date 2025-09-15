@@ -6,6 +6,11 @@ from datetime import datetime, timedelta
 SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\chwe tracker app files"
 TECH_FILE = os.path.join(SYNCED_FOLDER, "tech.json")
 
+def ensure_tech_file():
+    if not os.path.exists(TECH_FILE):
+        with open(TECH_FILE, "w") as f:
+            json.dump([], f)
+
 
 # Make sure folder exists
 def ensure_synced_folder():
@@ -232,6 +237,7 @@ def export_technicians_ui():
 def main():
     st.title("Service Tracker")
 
+    ensure_tech_file()
     ensure_synced_folder()
 
     # Load tech list into session state on startup or refresh
