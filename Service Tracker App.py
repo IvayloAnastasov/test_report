@@ -280,10 +280,10 @@ def main():
     st.subheader(choice)
 
     if choice == "Home":
-    st.write("Welcome to the Service Tracker App!")
-    st.markdown("### Files in Synced Folder")
+        st.write("Welcome to the Service Tracker App!")
+        st.markdown("### Files in Synced Folder")
 
-    files = list_files_in_folder(SYNCED_FOLDER)
+        files = list_files_in_folder(SYNCED_FOLDER)
     if not files:
         st.info("No files found in the synced folder.")
     else:
