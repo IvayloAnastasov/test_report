@@ -7,7 +7,7 @@ import platform
 import shutil  # for checking which binary exists
 
 # Config
-SYNCED_FOLDER = r"/mnt/c/Users/Ia/OneDrive - Eltronic Group A S/chwe tracker app files"
+SYNCED_FOLDER = r"/Users/Ia/OneDrive - Eltronic Group A S/chwe tracker app files"
 TECH_FILE = os.path.join(SYNCED_FOLDER, "tech.json")
 
 
