@@ -3,56 +3,34 @@ import json
 import os
 from datetime import datetime, timedelta
 
-# ----------------------------
-# Constants
-# ----------------------------
-DATA_DIR = "data"
-TECH_FILE = os.path.join(DATA_DIR, "tech.json")
+# 🔧 SET THIS TO YOUR LOCAL SYNC FOLDER PATH
+SYNCED_FOLDER = "C:\Users\Ia\OneDrive - Eltronic Group A S\chwe tracker app files" 
+TECH_FILE = os.path.join(SYNCED_FOLDER, "tech.json")
 
 # ----------------------------
-# Utility Functions for File I/O
+# File I/O Utilities
 # ----------------------------
 
-def ensure_data_dir():
-    os.makedirs(DATA_DIR, exist_ok=True)
+def ensure_synced_folder():
+    os.makedirs(SYNCED_FOLDER, exist_ok=True)
 
 def save_tech_to_disk():
-    ensure_data_dir()
+    ensure_synced_folder()
     with open(TECH_FILE, "w") as f:
         json.dump(st.session_state.tech, f, indent=4)
 
 def load_tech_from_disk():
-    if os.path.exists(TECH_FILE):
+    try:
         with open(TECH_FILE, "r") as f:
             st.session_state.tech = json.load(f)
-    else:
+    except FileNotFoundError:
         st.session_state.tech = []
-
-def export_tech_file():
-    tech_data = json.dumps(st.session_state.tech, indent=4)
-    st.download_button(
-        label="📤 Export Technicians as JSON",
-        data=tech_data,
-        file_name="tech_export.json",
-        mime="application/json"
-    )
-
-def import_tech_file():
-    uploaded = st.file_uploader("📥 Import Technicians JSON File", type="json")
-    if uploaded:
-        try:
-            tech_data = json.load(uploaded)
-            if isinstance(tech_data, list):
-                st.session_state.tech = tech_data
-                save_tech_to_disk()
-                st.success("Technicians imported successfully.")
-            else:
-                st.error("Invalid file format. Expected a list.")
-        except Exception as e:
-            st.error(f"Failed to import: {e}")
+    except Exception as e:
+        st.session_state.tech = []
+        st.error(f"Failed to load tech list: {e}")
 
 # ----------------------------
-# Initialize session state
+# Session Initialization
 # ----------------------------
 
 if "tech" not in st.session_state:
@@ -80,7 +58,7 @@ def add_technician_ui():
     name = st.text_input("Name", key="tech_name")
     phone = st.text_input("Phone", key="tech_phone")
     email = st.text_input("Email", key="tech_email")
-    
+
     if st.button("Add Technician"):
         if not name.strip():
             st.warning("Name is required")
@@ -95,9 +73,9 @@ def add_technician_ui():
             })
             save_tech_to_disk()
             st.success(f"Added technician {name}")
-            st.session_state["tech_name"] = ""
-            st.session_state["tech_phone"] = ""
-            st.session_state["tech_email"] = ""
+            st.session_state.tech_name = ""
+            st.session_state.tech_phone = ""
+            st.session_state.tech_email = ""
 
 def list_technicians_ui():
     st.subheader("Technicians")
@@ -232,7 +210,7 @@ def report_ui():
             st.write(f"ID {t['id']}: {t['description']} — Tech: {tech_name} — Completed: {comp}")
 
 # ----------------------------
-# Main Application
+# Main App Entry Point
 # ----------------------------
 
 def main():
@@ -247,8 +225,7 @@ def main():
         "Mark Task Done",
         "Update Task",
         "Delete Task",
-        "Report Last 30 Days",
-        "Import/Export"
+        "Report Last 30 Days"
     ]
 
     if "selected_menu" not in st.session_state:
@@ -282,17 +259,8 @@ def main():
         delete_task_ui()
     elif choice == "Report Last 30 Days":
         report_ui()
-    elif choice == "Import/Export":
-        st.write("## Import Technicians")
-        import_tech_file()
-        st.write("## Export Technicians")
-        export_tech_file()
     else:
         st.write("Unknown option.")
-
-# ----------------------------
-# Run the App
-# ----------------------------
 
 if __name__ == "__main__":
     main()
