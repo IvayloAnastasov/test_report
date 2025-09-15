@@ -2,6 +2,9 @@ import streamlit as st
 import json
 import os
 from datetime import datetime, timedelta
+import subprocess
+import platform
+
 
 # Config
 SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\schwe tracker app files"
@@ -285,11 +288,25 @@ def main():
         st.markdown("### Files in Synced Folder")
 
         # Button to open folder in Windows Explorer
-        if st.button("Open Synced Folder in Explorer"):
-            try:
-                os.startfile(SYNCED_FOLDER)
-            except Exception as e:
-                st.error(f"Failed to open folder: {e}")
+        import subprocess
+import platform
+
+# ...
+
+if st.button("Open Synced Folder in Explorer"):
+    try:
+        system_platform = platform.system()
+        if system_platform == "Windows":
+            os.startfile(SYNCED_FOLDER)
+        elif system_platform == "Darwin":  # macOS
+            subprocess.run(["open", SYNCED_FOLDER])
+        elif system_platform == "Linux":
+            subprocess.run(["xdg-open", SYNCED_FOLDER])
+        else:
+            st.warning(f"Opening folders not supported on {system_platform}.")
+    except Exception as e:
+        st.error(f"Failed to open folder: {e}")
+
 
         files = list_files_in_folder(SYNCED_FOLDER)
         if not files:
