@@ -6,7 +6,7 @@ import subprocess
 import platform
 
 # Config
-SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\schwe tracker app files"
+SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\chwe tracker app files"
 TECH_FILE = os.path.join(SYNCED_FOLDER, "tech.json")
 
 # Ensure folder exists
