@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timedelta
 
 # Config
-SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\chwe tracker app files"
+SYNCED_FOLDER = r"C:\Users\Ia\OneDrive - Eltronic Group A S\schwe tracker app files"
 TECH_FILE = os.path.join(SYNCED_FOLDER, "tech.json")
 
 # Ensure folder exists
@@ -16,12 +16,6 @@ def ensure_tech_file():
     if not os.path.exists(TECH_FILE):
         with open(TECH_FILE, "w") as f:
             json.dump([], f)
-def list_files_in_folder(folder):
-    try:
-        return sorted([f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))])
-    except Exception as e:
-        st.error(f"Failed to list files: {e}")
-        return []
 
 # Load technicians from disk
 def load_tech_from_disk():
@@ -93,10 +87,6 @@ def list_technicians_ui():
     else:
         for t in techs:
             st.write(f"ID {t['id']}: {t['name']} | Phone: {t['phone']} | Email: {t['email']}")
-
-# Initialize tasks in session state
-if "tasks" not in st.session_state:
-    st.session_state.tasks = []
 
 # UI: Add task
 def add_task_ui():
@@ -245,6 +235,15 @@ def export_technicians_ui():
     else:
         st.write("No technicians to export.")
 
+# Detect files in folder
+def list_files_in_folder(folder):
+    try:
+        return sorted([f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))])
+    except Exception as e:
+        st.error(f"Failed to list files: {e}")
+        return []
+
+# Main function
 def main():
     st.title("Service Tracker")
 
@@ -254,6 +253,9 @@ def main():
     # Load tech list into session state only once
     if "tech" not in st.session_state:
         st.session_state.tech = load_tech_from_disk()
+
+    if "tasks" not in st.session_state:
+        st.session_state.tasks = []
 
     menu = [
         "Home",
@@ -284,11 +286,13 @@ def main():
         st.markdown("### Files in Synced Folder")
 
         files = list_files_in_folder(SYNCED_FOLDER)
-    if not files:
-        st.info("No files found in the synced folder.")
-    else:
-        for file in files:
-            st.write(f"- {file}")
+        if not files:
+            st.info("No files found in the synced folder.")
+        else:
+            for file in files:
+                file_path = os.path.join(SYNCED_FOLDER, file)
+                with open(file_path, "rb") as f:
+                    st.download_button(label=f"Download {file}", data=f, file_name=file)
 
     elif choice == "Add Technician":
         add_technician_ui()
