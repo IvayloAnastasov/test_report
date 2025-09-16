@@ -167,13 +167,25 @@ def list_tasks_ui(show_all=True):
     if not tasks:
         st.write("No tasks yet.")
         return
+    
+    if not show_all:
+        tasks = [t for t in tasks if not t["done"]]
+
+    tasks_data = []
     for t in tasks:
-        if not show_all and t["done"]:
-            continue
-        status = "✅ Done" if t["done"] else "❗ Pending"
         tech_name = get_technician_name(techs, t["technician_id"])
         created = datetime.fromisoformat(t["created_at"]).strftime("%Y-%m-%d")
-        st.write(f"ID {t['id']}: {t['description']} — Tech: {tech_name} — Created: {created} — Status: {status}")
+        status = "✅ Done" if t["done"] else "❗ Pending"
+
+        tasks_data.append({
+            "ID": t["id"],
+            "Description": t["description"],
+            "Technician": tech_name,
+            "Created": created,
+            "Status": status
+        })
+
+    st.dataframe(tasks_data)
 
 def mark_task_done_ui():
     st.subheader("Mark Task as Done")
