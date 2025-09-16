@@ -1,17 +1,14 @@
 import streamlit as st
 import json
 from datetime import datetime, timedelta
-import requests
-
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 # ---------------------- CONFIGURATION ----------------------
 
-SPREADSHEET_ID = "1tTjNIHuwQ0PcsfK2Si7IjLP_S0ZeJLmo7C1yMyGqw18"  # your Google Sheet ID
-WORKSHEET_NAME = "Sheet1"  # tab name
-
-TECH_GITHUB_URL = "https://raw.githubusercontent.com/IvayloAnastasov/test_report/refs/heads/main/tech_update.json"
+SPREADSHEET_ID = "1tTjNIHuwQ0PcsfK2Si7IjLP_S0ZeJLmo7C1yMyGqw18"
+WORKSHEET_NAME = "Sheet1"
+TECHNICIANS_SHEET = "Technicians"
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -26,14 +23,40 @@ def get_gsheet_client():
     client = gspread.authorize(creds)
     return client
 
-def get_worksheet():
+def get_worksheet(name):
     client = get_gsheet_client()
     sh = client.open_by_key(SPREADSHEET_ID)
-    ws = sh.worksheet(WORKSHEET_NAME)
-    return ws
+    return sh.worksheet(name)
+
+# ---------------------- TECHNICIANS ----------------------
+
+def load_technicians_from_sheet():
+    try:
+        ws = get_worksheet(TECHNICIANS_SHEET)
+        records = ws.get_all_records()
+        technicians = []
+        for r in records:
+            technicians.append({
+                "id": int(r.get("ID")),
+                "name": r.get("Name"),
+                "email": r.get("Email", ""),
+                "phone": r.get("Phone", "")
+            })
+        return technicians
+    except Exception as e:
+        st.error(f"Error loading technicians from Google Sheet: {e}")
+        return []
+
+def get_technician_name(technicians, tech_id):
+    for t in technicians:
+        if t["id"] == tech_id:
+            return t["name"]
+    return "Unknown"
+
+# ---------------------- TASKS ----------------------
 
 def append_task_to_sheet(task, tech_name):
-    ws = get_worksheet()
+    ws = get_worksheet(WORKSHEET_NAME)
     row = [
         task["id"],
         tech_name,
@@ -48,16 +71,16 @@ def append_task_to_sheet(task, tech_name):
         st.error(f"Failed to append to Google Sheet: {e}")
 
 def update_task_status_in_sheet(task_id, completed_at):
-    ws = get_worksheet()
+    ws = get_worksheet(WORKSHEET_NAME)
     all_records = ws.get_all_records()
     for idx, rec in enumerate(all_records, start=2):
         if str(rec.get("ID")) == str(task_id):
-            ws.update_cell(idx, 5, "Done")           # column E
-            ws.update_cell(idx, 6, completed_at)     # column F
+            ws.update_cell(idx, 5, "Done")           # Status column
+            ws.update_cell(idx, 6, completed_at)     # Completed At column
             break
 
 def load_tasks_from_sheet():
-    ws = get_worksheet()
+    ws = get_worksheet(WORKSHEET_NAME)
     records = ws.get_all_records()
     tasks = []
     techs = st.session_state.get("tech", [])
@@ -80,32 +103,10 @@ def load_tasks_from_sheet():
             st.warning(f"Skipping row due to error: {e}")
     return tasks
 
-# ---------------------- GITHUB TECHNICIANS LOAD ----------------------
-
-def load_technicians_from_github():
-    try:
-        resp = requests.get(TECH_GITHUB_URL)
-        resp.raise_for_status()
-        data = resp.json()
-        if isinstance(data, list):
-            return data
-        else:
-            st.error("Technicians JSON from GitHub is not a list.")
-            return []
-    except Exception as e:
-        st.error(f"Error loading technicians from GitHub: {e}")
-        return []
-
-# ---------------------- TASK MANAGEMENT + UI ----------------------
-
-def get_technician_name(technicians, tech_id):
-    for t in technicians:
-        if t["id"] == tech_id:
-            return t["name"]
-    return "Unknown"
+# ---------------------- UI FUNCTIONS ----------------------
 
 def list_technicians_ui():
-    st.subheader("Technicians (from GitHub)")
+    st.subheader("Technicians")
     techs = st.session_state.tech
     if not techs:
         st.write("No technicians found.")
@@ -130,7 +131,7 @@ def add_task_ui():
         if not description.strip():
             st.warning("Description is required.")
         else:
-            ws = get_worksheet()
+            ws = get_worksheet(WORKSHEET_NAME)
             existing_tasks = ws.get_all_records()
             existing_ids = [int(t.get("ID", 0)) for t in existing_tasks]
             new_id = max(existing_ids or [0]) + 1
@@ -144,10 +145,7 @@ def add_task_ui():
                 "completed_at": None
             }
 
-            # Save to Google Sheet
             append_task_to_sheet(task, selected_tech_name)
-
-            # Reload tasks from sheet
             st.session_state.tasks = load_tasks_from_sheet()
 
             st.success(f"Task added: {description.strip()}")
@@ -205,13 +203,11 @@ def report_ui():
 # ---------------------- MAIN ----------------------
 
 def main():
-    st.title("Service Tracker with Techs from GitHub")
+    st.title("Service Tracker")
 
-    # Load techs from GitHub once
     if "tech" not in st.session_state:
-        st.session_state.tech = load_technicians_from_github()
+        st.session_state.tech = load_technicians_from_sheet()
 
-    # Always load tasks from Google Sheets on each app load
     st.session_state.tasks = load_tasks_from_sheet()
 
     menu = [
@@ -227,7 +223,7 @@ def main():
     st.subheader(choice)
 
     if choice == "Home":
-        st.write("Welcome to Service Tracker App")
+        st.write("Welcome to the Service Tracker App")
     elif choice == "List Technicians":
         list_technicians_ui()
     elif choice == "Add Task":
