@@ -28,6 +28,13 @@ def get_worksheet(name):
     sh = client.open_by_key(SPREADSHEET_ID)
     return sh.worksheet(name)
 
+def ensure_headers_exist():
+    ws = get_worksheet(WORKSHEET_NAME)
+    headers = ws.row_values(1)
+    expected = ["ID", "Technician", "Description", "Created At", "Status", "Completed At"]
+    if headers != expected:
+        ws.insert_row(expected, index=1)
+
 # ---------------------- TECHNICIANS ----------------------
 
 def load_technicians_from_sheet():
@@ -62,8 +69,8 @@ def append_task_to_sheet(task, tech_name):
         tech_name,
         task["description"],
         task["created_at"],
-        "Pending",
-        ""
+        "Done" if task["done"] else "Pending",
+        task["completed_at"] or ""
     ]
     try:
         ws.append_row(row, value_input_option='USER_ENTERED')
@@ -82,9 +89,12 @@ def update_task_status_in_sheet(task_id, completed_at):
 def load_tasks_from_sheet():
     ws = get_worksheet(WORKSHEET_NAME)
     records = ws.get_all_records()
-    tasks = []
-    techs = st.session_state.get("tech", [])
 
+    if "tech" not in st.session_state:
+        st.session_state.tech = load_technicians_from_sheet()
+    techs = st.session_state.tech
+
+    tasks = []
     for rec in records:
         try:
             tech_name = rec.get("Technician")
@@ -93,10 +103,10 @@ def load_tasks_from_sheet():
             task = {
                 "id": int(rec.get("ID")),
                 "technician_id": tech_id,
-                "description": rec.get("Description"),
-                "created_at": rec.get("Created At"),
-                "done": rec.get("Status") == "Done",
-                "completed_at": rec.get("Completed At") if rec.get("Completed At") else None
+                "description": rec.get("Description", ""),
+                "created_at": rec.get("Created At", ""),
+                "done": rec.get("Status", "").strip().lower() == "done",
+                "completed_at": rec.get("Completed At") or None
             }
             tasks.append(task)
         except Exception as e:
@@ -147,7 +157,6 @@ def add_task_ui():
 
             append_task_to_sheet(task, selected_tech_name)
             st.session_state.tasks = load_tasks_from_sheet()
-
             st.success(f"Task added: {description.strip()}")
             st.session_state["task_desc"] = ""
 
@@ -205,10 +214,12 @@ def report_ui():
 def main():
     st.title("Service Tracker")
 
+    ensure_headers_exist()
+
     if "tech" not in st.session_state:
         st.session_state.tech = load_technicians_from_sheet()
-
-    st.session_state.tasks = load_tasks_from_sheet()
+    if "tasks" not in st.session_state:
+        st.session_state.tasks = load_tasks_from_sheet()
 
     menu = [
         "Home",
