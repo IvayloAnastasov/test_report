@@ -212,14 +212,25 @@ def report_ui():
     tasks = st.session_state.tasks
     techs = st.session_state.tech
     cutoff = datetime.now() - timedelta(days=30)
+    
     done_tasks = [t for t in tasks if t["done"] and t.get("completed_at") and datetime.fromisoformat(t["completed_at"]) >= cutoff]
+    
     if not done_tasks:
         st.write("No tasks completed in the last 30 days.")
     else:
+        report_data = []
         for t in done_tasks:
             tech_name = get_technician_name(techs, t["technician_id"])
-            comp = datetime.fromisoformat(t["completed_at"]).strftime("%Y-%m-%d")
-            st.write(f"ID {t['id']}: {t['description']} — Tech: {tech_name} — Completed: {comp}")
+            comp_date = datetime.fromisoformat(t["completed_at"]).strftime("%Y-%m-%d")
+            
+            report_data.append({
+                "ID": t["id"],
+                "Description": t["description"],
+                "Technician": tech_name,
+                "Date Completed": comp_date
+            })
+        
+        st.dataframe(report_data)
 
 # ---------------------- MAIN ----------------------
 
