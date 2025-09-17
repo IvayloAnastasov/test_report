@@ -235,6 +235,7 @@ def report_ui():
 # ---------------------- MAIN ----------------------
 
 def main():
+    st.set_page_config(layout="wide")  # Optional: makes full-width layout possible
     st.title("🛠️ Service Tracker")
 
     ensure_headers_exist()
@@ -246,7 +247,7 @@ def main():
     if "page" not in st.session_state:
         st.session_state.page = "Home"
 
-    # Navigation buttons in a single horizontal line
+    # Define menu items and icons
     nav_labels = {
         "Home": "🏠",
         "List Technicians": "👨‍🔧",
@@ -256,31 +257,34 @@ def main():
         "Report Last 30 Days": "📊"
     }
 
-    # Force uniform, compact layout
-    col_width = 1 / len(nav_labels)
-    cols = st.columns([col_width] * len(nav_labels))
+    # Layout: 1 column for nav (left), 1 for content (right)
+    nav_col, content_col = st.columns([1, 5])
 
-    for idx, (label, icon) in enumerate(nav_labels.items()):
-        if cols[idx].button(f"{icon}\n{label}"):
-            st.session_state.page = label
-
-    st.markdown("---")
-    st.subheader(st.session_state.page)
+    # Navigation buttons (vertical)
+    with nav_col:
+        st.markdown("### Menu")
+        for label, icon in nav_labels.items():
+            if st.button(f"{icon} {label}", key=label):
+                st.session_state.page = label
 
     # Render selected page
-    if st.session_state.page == "Home":
-        st.write("Welcome to the Service Tracker App")
-    elif st.session_state.page == "List Technicians":
-        list_technicians_ui()
-    elif st.session_state.page == "Add Task":
-        add_task_ui()
-    elif st.session_state.page == "List Tasks":
-        show_all = st.checkbox("Show all (including done)", value=True, key="show_all_tasks")
-        list_tasks_ui(show_all)
-    elif st.session_state.page == "Mark Task Done":
-        mark_task_done_ui()
-    elif st.session_state.page == "Report Last 30 Days":
-        report_ui()
+    with content_col:
+        st.subheader(st.session_state.page)
+
+        if st.session_state.page == "Home":
+            st.write("Welcome to the Service Tracker App")
+        elif st.session_state.page == "List Technicians":
+            list_technicians_ui()
+        elif st.session_state.page == "Add Task":
+            add_task_ui()
+        elif st.session_state.page == "List Tasks":
+            show_all = st.checkbox("Show all (including done)", value=True, key="show_all_tasks")
+            list_tasks_ui(show_all)
+        elif st.session_state.page == "Mark Task Done":
+            mark_task_done_ui()
+        elif st.session_state.page == "Report Last 30 Days":
+            report_ui()
+
 
 if __name__ == "__main__":
     main()
