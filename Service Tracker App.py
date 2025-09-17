@@ -247,23 +247,6 @@ def main():
     if "page" not in st.session_state:
         st.session_state.page = "Home"
 
-    # Custom CSS to make left nav gray
-    st.markdown("""
-        <style>
-            .nav-container {
-                background-color: #C0C0C0;
-                padding: 20px;
-                border-radius: 8px;
-                height: 100%;
-            }
-            .nav-button {
-                display: block;
-                width: 100%;
-                margin: 10px 0;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
     # Define navigation icons and labels
     nav_labels = {
         "Home": "🏠",
@@ -274,20 +257,35 @@ def main():
         "Report Last 30 Days": "📊"
     }
 
-    # Two-column layout: nav on the left, content on the right
+    # Inject CSS for gray background
+    st.markdown("""
+        <style>
+            .gray-box {
+                background-color: #C0C0C0;
+                padding: 20px;
+                border-radius: 10px;
+                height: 100%;
+            }
+            .gray-box button {
+                margin-bottom: 10px;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Layout: 1 column for nav (left), 1 for content (right)
     nav_col, content_col = st.columns([1, 5])
 
-    # Navigation menu in gray background
+    # Left vertical nav menu with gray background
     with nav_col:
         with st.container():
-            st.markdown('<div class="nav-container">', unsafe_allow_html=True)
+            st.markdown('<div class="gray-box">', unsafe_allow_html=True)
             st.markdown("### Menu")
             for label, icon in nav_labels.items():
                 if st.button(f"{icon} {label}", key=label):
                     st.session_state.page = label
-            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    # Page content area
+    # Page content
     with content_col:
         st.subheader(st.session_state.page)
 
