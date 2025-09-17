@@ -207,6 +207,47 @@ def mark_task_done_ui():
                 st.success(f"Task ID {task_id} marked done.")
                 break
 
+def update_task_ui():
+    st.subheader("Update Task")
+    tasks = st.session_state.tasks
+    techs = st.session_state.tech
+
+    if not tasks:
+        st.warning("No tasks available.")
+        return
+
+    task_options = {f"ID {t['id']}: {t['description']}": t for t in tasks}
+    selected_label = st.selectbox("Select task to update", list(task_options.keys()), key="update_task_select")
+    selected_task = task_options[selected_label]
+
+    new_description = st.text_input("Description", value=selected_task["description"], key="update_desc")
+    tech_names = {t["name"]: t["id"] for t in techs}
+    new_tech_name = st.selectbox("Technician", list(tech_names.keys()),
+                                 index=list(tech_names.values()).index(selected_task["technician_id"]),
+                                 key="update_tech")
+    new_status = st.selectbox("Status", ["Pending", "Done"], index=1 if selected_task["done"] else 0, key="update_status")
+
+    if st.button("Update Task"):
+        updated_at = datetime.now().isoformat()
+        new_done = new_status == "Done"
+        new_completed_at = updated_at if new_done else ""
+
+        try:
+            ws = get_worksheet(WORKSHEET_NAME)
+            records = ws.get_all_records()
+            for idx, rec in enumerate(records, start=2):
+                if int(rec.get("ID")) == selected_task["id"]:
+                    ws.update_cell(idx, 2, new_tech_name)
+                    ws.update_cell(idx, 3, new_description)
+                    ws.update_cell(idx, 5, new_status)
+                    ws.update_cell(idx, 6, new_completed_at)
+                    break
+
+            st.session_state.tasks = load_tasks_from_sheet()
+            st.success("Task updated successfully.")
+        except Exception as e:
+            st.error(f"Error updating task: {e}")
+
 def report_ui():
     st.subheader("Report: Tasks Completed in Last 30 Days")
     tasks = st.session_state.tasks
@@ -246,29 +287,24 @@ def main():
     if "page" not in st.session_state:
         st.session_state.page = "Home"
 
-    # Define navigation icons and labels
     nav_labels = {
         "Home": "🏠",
         "List Technicians": "👨‍🔧",
         "Add Task": "➕",
         "List Tasks": "📋",
         "Mark Task Done": "✅",
+        "Update Task": "✏️",
         "Report Last 30 Days": "📊"
     }
 
-
-
-    # Layout: 1 column for nav (left), 1 for content (right)
     nav_col, content_col = st.columns([1, 5])
 
-    # Left vertical nav menu inside styled column
     with nav_col:
         st.markdown("### Menu")
         for label, icon in nav_labels.items():
             if st.button(f"{icon} {label}", key=label):
                 st.session_state.page = label
 
-    # Right column: page content
     with content_col:
         st.subheader(st.session_state.page)
 
@@ -283,6 +319,8 @@ def main():
             list_tasks_ui(show_all)
         elif st.session_state.page == "Mark Task Done":
             mark_task_done_ui()
+        elif st.session_state.page == "Update Task":
+            update_task_ui()
         elif st.session_state.page == "Report Last 30 Days":
             report_ui()
 
