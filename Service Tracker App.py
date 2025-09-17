@@ -235,7 +235,7 @@ def report_ui():
 # ---------------------- MAIN ----------------------
 
 def main():
-    st.set_page_config(layout="wide")  # Optional: makes full-width layout possible
+    st.set_page_config(layout="wide")
     st.title("🛠️ Service Tracker")
 
     ensure_headers_exist()
@@ -247,7 +247,24 @@ def main():
     if "page" not in st.session_state:
         st.session_state.page = "Home"
 
-    # Define menu items and icons
+    # Custom CSS to make left nav gray
+    st.markdown("""
+        <style>
+            .nav-container {
+                background-color: #C0C0C0;
+                padding: 20px;
+                border-radius: 8px;
+                height: 100%;
+            }
+            .nav-button {
+                display: block;
+                width: 100%;
+                margin: 10px 0;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Define navigation icons and labels
     nav_labels = {
         "Home": "🏠",
         "List Technicians": "👨‍🔧",
@@ -257,17 +274,20 @@ def main():
         "Report Last 30 Days": "📊"
     }
 
-    # Layout: 1 column for nav (left), 1 for content (right)
+    # Two-column layout: nav on the left, content on the right
     nav_col, content_col = st.columns([1, 5])
 
-    # Navigation buttons (vertical)
+    # Navigation menu in gray background
     with nav_col:
-        st.markdown("### Menu")
-        for label, icon in nav_labels.items():
-            if st.button(f"{icon} {label}", key=label):
-                st.session_state.page = label
+        with st.container():
+            st.markdown('<div class="nav-container">', unsafe_allow_html=True)
+            st.markdown("### Menu")
+            for label, icon in nav_labels.items():
+                if st.button(f"{icon} {label}", key=label):
+                    st.session_state.page = label
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    # Render selected page
+    # Page content area
     with content_col:
         st.subheader(st.session_state.page)
 
