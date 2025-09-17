@@ -82,8 +82,8 @@ def update_task_status_in_sheet(task_id, completed_at):
     all_records = ws.get_all_records()
     for idx, rec in enumerate(all_records, start=2):
         if str(rec.get("ID")) == str(task_id):
-            ws.update_cell(idx, 5, "Done")
-            ws.update_cell(idx, 6, completed_at)
+            ws.update_cell(idx, 5, "Done")           # Status column
+            ws.update_cell(idx, 6, completed_at)     # Completed At column
             break
 
 def load_tasks_from_sheet():
@@ -243,65 +243,17 @@ def main():
         st.session_state.tech = load_technicians_from_sheet()
     if "tasks" not in st.session_state:
         st.session_state.tasks = load_tasks_from_sheet()
-    if "current_page" not in st.session_state:
-        st.session_state.current_page = "Home"
 
-    st.sidebar.markdown(
-        """
-        <style>
-        div[data-testid="stSidebarNav"] ul {
-            max-height: 100vh !important;
-        }
-        .sidebar .stButton > button {
-            color: black;
-            background-color: #f0f2f6;
-            border-radius: 5px;
-            border: 1px solid #d3d3d3;
-            width: 100%;
-            margin-bottom: 10px;
-            font-size: 16px;
-            padding: 10px;
-        }
-        .sidebar .stButton > button:hover {
-            background-color: #e6e6e6;
-            border-color: #c0c0c0;
-        }
-        .sidebar .stButton.active > button {
-            color: white;
-            background-color: #1E90FF; /* DodgerBlue */
-            border-color: #1E90FF;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-    
-    menu_items = {
-        "Home": "🏠",
-        "List Technicians": "👥",
-        "Add Task": "➕",
-        "List Tasks": "📋",
-        "Mark Task Done": "✅",
-        "Report Last 30 Days": "📈"
-    }
+    menu = [
+        "Home",
+        "List Technicians",
+        "Add Task",
+        "List Tasks",
+        "Mark Task Done",
+        "Report Last 30 Days"
+    ]
 
-    st.sidebar.title("Menu")
-    
-    for page, icon in menu_items.items():
-        is_active = st.session_state.current_page == page
-        button_label = f"{icon} {page}"
-        
-        if is_active:
-            st.sidebar.markdown(f'<div class="sidebar active">', unsafe_allow_html=True)
-        
-        if st.sidebar.button(button_label, key=f"btn_{page}"):
-            st.session_state.current_page = page
-            st.experimental_rerun()
-            
-        if is_active:
-            st.sidebar.markdown('</div>', unsafe_allow_html=True)
-        
-    choice = st.session_state.current_page
+    choice = st.sidebar.radio("Navigate", menu)
     st.subheader(choice)
 
     if choice == "Home":
