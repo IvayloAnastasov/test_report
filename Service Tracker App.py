@@ -233,7 +233,6 @@ def report_ui():
         st.dataframe(report_data)
 
 # ---------------------- MAIN ----------------------
-
 def main():
     st.set_page_config(layout="wide")
     st.title("🛠️ Service Tracker")
@@ -257,17 +256,22 @@ def main():
         "Report Last 30 Days": "📊"
     }
 
-    # Inject CSS for gray background
+    # Inject CSS that applies to a specific Streamlit column
     st.markdown("""
         <style>
-            .gray-box {
+            .block-container {
+                padding-top: 1rem;
+            }
+            div[data-testid="column"] > div:first-child {
                 background-color: #C0C0C0;
                 padding: 20px;
                 border-radius: 10px;
                 height: 100%;
             }
-            .gray-box button {
+            button[kind="secondary"] {
                 margin-bottom: 10px;
+                width: 100%;
+                text-align: left;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -275,17 +279,14 @@ def main():
     # Layout: 1 column for nav (left), 1 for content (right)
     nav_col, content_col = st.columns([1, 5])
 
-    # Left vertical nav menu with gray background
+    # Left vertical nav menu inside styled column
     with nav_col:
-        with st.container():
-            st.markdown('<div class="gray-box">', unsafe_allow_html=True)
-            st.markdown("### Menu")
-            for label, icon in nav_labels.items():
-                if st.button(f"{icon} {label}", key=label):
-                    st.session_state.page = label
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("### Menu")
+        for label, icon in nav_labels.items():
+            if st.button(f"{icon} {label}", key=label):
+                st.session_state.page = label
 
-    # Page content
+    # Right column: page content
     with content_col:
         st.subheader(st.session_state.page)
 
@@ -302,7 +303,6 @@ def main():
             mark_task_done_ui()
         elif st.session_state.page == "Report Last 30 Days":
             report_ui()
-
 
 if __name__ == "__main__":
     main()
