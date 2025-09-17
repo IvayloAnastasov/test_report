@@ -31,7 +31,7 @@ def get_worksheet(name):
 def ensure_headers_exist():
     ws = get_worksheet(WORKSHEET_NAME)
     headers = ws.row_values(1)
-    expected = ["ID", "Technician", "Description", "Created At", "Status", "Completed At"]
+    expected = ["ID", "Technician", "Description", "Equipment ID", "Created At", "Status", "Completed At"]
     if headers != expected:
         ws.insert_row(expected, index=1)
 
@@ -68,6 +68,7 @@ def append_task_to_sheet(task, tech_name):
         task["id"],
         tech_name,
         task["description"],
+        task["equipment_id"],
         task["created_at"],
         "Done" if task["done"] else "Pending",
         task["completed_at"] or ""
@@ -104,6 +105,7 @@ def load_tasks_from_sheet():
                 "id": int(rec.get("ID")),
                 "technician_id": tech_id,
                 "description": rec.get("Description", ""),
+                "equipment_id": rec.get("Equipment ID", ""),  # NEW FIELD
                 "created_at": rec.get("Created At", ""),
                 "done": rec.get("Status", "").strip().lower() == "done",
                 "completed_at": rec.get("Completed At") or None
@@ -136,6 +138,7 @@ def add_task_ui():
     tech_options = {t["name"]: t["id"] for t in techs}
     selected_tech_name = st.selectbox("Assign to Technician", list(tech_options.keys()), key="task_tech")
     description = st.text_input("Task Description", key="task_desc")
+    equipment_id = st.text_input("Equipment ID", key="task_equip_id")  # NEW INPUT
 
     if st.button("Add Task"):
         if not description.strip():
@@ -150,6 +153,7 @@ def add_task_ui():
                 "id": new_id,
                 "technician_id": tech_options[selected_tech_name],
                 "description": description.strip(),
+                "equipment_id": equipment_id.strip(),  # NEW FIELD
                 "created_at": datetime.now().isoformat(),
                 "done": False,
                 "completed_at": None
@@ -159,6 +163,7 @@ def add_task_ui():
             st.session_state.tasks = load_tasks_from_sheet()
             st.success(f"Task added: {description.strip()}")
             st.session_state["task_desc"] = ""
+            st.session_state["task_equip_id"] = ""
 
 def list_tasks_ui(show_all=True):
     st.subheader("Tasks")
@@ -180,6 +185,7 @@ def list_tasks_ui(show_all=True):
         tasks_data.append({
             "ID": t["id"],
             "Description": t["description"],
+            "Equipment ID": t.get("equipment_id", ""),  # NEW FIELD
             "Technician": tech_name,
             "Created": created,
             "Status": status
@@ -221,6 +227,7 @@ def update_task_ui():
     selected_task = task_options[selected_label]
 
     new_description = st.text_input("Description", value=selected_task["description"], key="update_desc")
+    new_equipment_id = st.text_input("Equipment ID", value=selected_task.get("equipment_id", ""), key="update_equip")  # NEW INPUT
     tech_names = {t["name"]: t["id"] for t in techs}
     new_tech_name = st.selectbox("Technician", list(tech_names.keys()),
                                  index=list(tech_names.values()).index(selected_task["technician_id"]),
@@ -239,6 +246,7 @@ def update_task_ui():
                 if int(rec.get("ID")) == selected_task["id"]:
                     ws.update_cell(idx, 2, new_tech_name)
                     ws.update_cell(idx, 3, new_description)
+                    ws.update_cell(idx, 4, new_equipment_id)  # UPDATE Equipment ID column
                     ws.update_cell(idx, 5, new_status)
                     ws.update_cell(idx, 6, new_completed_at)
                     break
@@ -267,6 +275,7 @@ def report_ui():
             report_data.append({
                 "ID": t["id"],
                 "Description": t["description"],
+                "Equipment ID": t.get("equipment_id", ""),  # OPTIONAL
                 "Technician": tech_name,
                 "Date Completed": comp_date
             })
