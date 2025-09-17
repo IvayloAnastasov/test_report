@@ -318,7 +318,7 @@ def main():
         st.subheader(st.session_state.page)
 
         if st.session_state.page == "Home":
-            st.write("Welcome to the Service Tracker App")
+            st.write("Welcome to the Service Tracker App for Enabl. You can find all tasks and report for all done tasks.Plese contact ia@enabl.dk for new users and technicians")
         elif st.session_state.page == "List Technicians":
             list_technicians_ui()
         elif st.session_state.page == "Add Task":
