@@ -256,25 +256,7 @@ def main():
         "Report Last 30 Days": "📊"
     }
 
-    # Inject CSS that applies to a specific Streamlit column
-    st.markdown("""
-        <style>
-            .block-container {
-                padding-top: 1rem;
-            }
-            div[data-testid="column"] > div:first-child {
-                background-color: #C0C0C0;
-                padding: 20px;
-                border-radius: 10px;
-                height: 100%;
-            }
-            button[kind="secondary"] {
-                margin-bottom: 10px;
-                width: 100%;
-                text-align: left;
-            }
-        </style>
-    """, unsafe_allow_html=True)
+
 
     # Layout: 1 column for nav (left), 1 for content (right)
     nav_col, content_col = st.columns([1, 5])
