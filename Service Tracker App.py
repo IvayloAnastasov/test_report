@@ -246,7 +246,7 @@ def main():
     if "page" not in st.session_state:
         st.session_state.page = "Home"
 
-    # Navigation buttons
+    # Navigation buttons in a single horizontal line
     nav_labels = {
         "Home": "🏠",
         "List Technicians": "👨‍🔧",
@@ -256,9 +256,12 @@ def main():
         "Report Last 30 Days": "📊"
     }
 
-    cols = st.columns(len(nav_labels))
+    # Force uniform, compact layout
+    col_width = 1 / len(nav_labels)
+    cols = st.columns([col_width] * len(nav_labels))
+
     for idx, (label, icon) in enumerate(nav_labels.items()):
-        if cols[idx].button(f"{icon} {label}"):
+        if cols[idx].button(f"{icon}\n{label}"):
             st.session_state.page = label
 
     st.markdown("---")
