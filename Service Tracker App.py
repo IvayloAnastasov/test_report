@@ -235,7 +235,7 @@ def report_ui():
 # ---------------------- MAIN ----------------------
 
 def main():
-    st.title("Service Tracker")
+    st.title("🛠️ Service Tracker")
 
     ensure_headers_exist()
 
@@ -243,31 +243,40 @@ def main():
         st.session_state.tech = load_technicians_from_sheet()
     if "tasks" not in st.session_state:
         st.session_state.tasks = load_tasks_from_sheet()
+    if "page" not in st.session_state:
+        st.session_state.page = "Home"
 
-    menu = [
-        "Home",
-        "List Technicians",
-        "Add Task",
-        "List Tasks",
-        "Mark Task Done",
-        "Report Last 30 Days"
-    ]
+    # Navigation buttons
+    nav_labels = {
+        "Home": "🏠",
+        "List Technicians": "👨‍🔧",
+        "Add Task": "➕",
+        "List Tasks": "📋",
+        "Mark Task Done": "✅",
+        "Report Last 30 Days": "📊"
+    }
 
-    choice = st.sidebar.radio("Navigate", menu)
-    st.subheader(choice)
+    cols = st.columns(len(nav_labels))
+    for idx, (label, icon) in enumerate(nav_labels.items()):
+        if cols[idx].button(f"{icon} {label}"):
+            st.session_state.page = label
 
-    if choice == "Home":
+    st.markdown("---")
+    st.subheader(st.session_state.page)
+
+    # Render selected page
+    if st.session_state.page == "Home":
         st.write("Welcome to the Service Tracker App")
-    elif choice == "List Technicians":
+    elif st.session_state.page == "List Technicians":
         list_technicians_ui()
-    elif choice == "Add Task":
+    elif st.session_state.page == "Add Task":
         add_task_ui()
-    elif choice == "List Tasks":
+    elif st.session_state.page == "List Tasks":
         show_all = st.checkbox("Show all (including done)", value=True, key="show_all_tasks")
         list_tasks_ui(show_all)
-    elif choice == "Mark Task Done":
+    elif st.session_state.page == "Mark Task Done":
         mark_task_done_ui()
-    elif choice == "Report Last 30 Days":
+    elif st.session_state.page == "Report Last 30 Days":
         report_ui()
 
 if __name__ == "__main__":
