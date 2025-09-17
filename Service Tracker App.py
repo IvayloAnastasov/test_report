@@ -291,9 +291,9 @@ def main():
         "Home": "🏠",
         "List Technicians": "👨‍🔧",
         "Add Task": "➕",
+        "Update Task": "✏️",
         "List Tasks": "📋",
         "Mark Task Done": "✅",
-        "Update Task": "✏️",
         "Report Last 30 Days": "📊"
     }
 
