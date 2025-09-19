@@ -33,6 +33,7 @@ def ensure_headers_exist():
     headers = ws.row_values(1)
     expected = ["ID", "Technician", "Description", "Equipment ID", "Created At", "Status", "Completed At"]
     if headers != expected:
+        ws.delete_rows(1)
         ws.insert_row(expected, index=1)
 
 # ---------------------- TECHNICIANS ----------------------
@@ -64,15 +65,20 @@ def get_technician_name(technicians, tech_id):
 
 def append_task_to_sheet(task, tech_name):
     ws = get_worksheet(WORKSHEET_NAME)
-    row = [
-        task["id"],
-        tech_name,
-        task["description"],
-        task["equipment_id"],
-        task["created_at"],
-        "Done" if task["done"] else "Pending",
-        task["completed_at"] or ""
-    ]
+    headers = ws.row_values(1)
+
+    value_map = {
+        "ID": task["id"],
+        "Technician": tech_name,
+        "Description": task["description"],
+        "Equipment ID": task["equipment_id"],
+        "Created At": task["created_at"],
+        "Status": "Done" if task["done"] else "Pending",
+        "Completed At": task["completed_at"] or ""
+    }
+
+    row = [value_map.get(col, "") for col in headers]
+
     try:
         ws.append_row(row, value_input_option='USER_ENTERED')
     except Exception as e:
@@ -80,12 +86,20 @@ def append_task_to_sheet(task, tech_name):
 
 def update_task_status_in_sheet(task_id, completed_at):
     ws = get_worksheet(WORKSHEET_NAME)
+    headers = ws.row_values(1)
     all_records = ws.get_all_records()
-    for idx, rec in enumerate(all_records, start=2):
-        if str(rec.get("ID")) == str(task_id):
-            ws.update_cell(idx, 5, "Done")           # Status column
-            ws.update_cell(idx, 6, completed_at)     # Completed At column
-            break
+
+    try:
+        for idx, rec in enumerate(all_records, start=2):  # row 2 onwards
+            if str(rec.get("ID")) == str(task_id):
+                status_col = headers.index("Status") + 1
+                completed_at_col = headers.index("Completed At") + 1
+
+                ws.update_cell(idx, status_col, "Done")
+                ws.update_cell(idx, completed_at_col, completed_at)
+                break
+    except Exception as e:
+        st.error(f"Failed to update task status: {e}")
 
 def load_tasks_from_sheet():
     ws = get_worksheet(WORKSHEET_NAME)
@@ -105,7 +119,7 @@ def load_tasks_from_sheet():
                 "id": int(rec.get("ID")),
                 "technician_id": tech_id,
                 "description": rec.get("Description", ""),
-                "equipment_id": rec.get("Equipment ID", ""),  # NEW FIELD
+                "equipment_id": rec.get("Equipment ID", ""),
                 "created_at": rec.get("Created At", ""),
                 "done": rec.get("Status", "").strip().lower() == "done",
                 "completed_at": rec.get("Completed At") or None
@@ -138,7 +152,7 @@ def add_task_ui():
     tech_options = {t["name"]: t["id"] for t in techs}
     selected_tech_name = st.selectbox("Assign to Technician", list(tech_options.keys()), key="task_tech")
     description = st.text_input("Task Description", key="task_desc")
-    equipment_id = st.text_input("Equipment ID", key="task_equip_id")  # NEW INPUT
+    equipment_id = st.text_input("Equipment ID", key="task_equip_id")
 
     if st.button("Add Task"):
         if not description.strip():
@@ -153,7 +167,7 @@ def add_task_ui():
                 "id": new_id,
                 "technician_id": tech_options[selected_tech_name],
                 "description": description.strip(),
-                "equipment_id": equipment_id.strip(),  # NEW FIELD
+                "equipment_id": equipment_id.strip(),
                 "created_at": datetime.now().isoformat(),
                 "done": False,
                 "completed_at": None
@@ -172,7 +186,7 @@ def list_tasks_ui(show_all=True):
     if not tasks:
         st.write("No tasks yet.")
         return
-    
+
     if not show_all:
         tasks = [t for t in tasks if not t["done"]]
 
@@ -185,7 +199,7 @@ def list_tasks_ui(show_all=True):
         tasks_data.append({
             "ID": t["id"],
             "Description": t["description"],
-            "Equipment ID": t.get("equipment_id", ""),  # NEW FIELD
+            "Equipment ID": t.get("equipment_id", ""),
             "Technician": tech_name,
             "Created": created,
             "Status": status
@@ -227,7 +241,7 @@ def update_task_ui():
     selected_task = task_options[selected_label]
 
     new_description = st.text_input("Description", value=selected_task["description"], key="update_desc")
-    new_equipment_id = st.text_input("Equipment ID", value=selected_task.get("equipment_id", ""), key="update_equip")  # NEW INPUT
+    new_equipment_id = st.text_input("Equipment ID", value=selected_task.get("equipment_id", ""), key="update_equip")
     tech_names = {t["name"]: t["id"] for t in techs}
     new_tech_name = st.selectbox("Technician", list(tech_names.keys()),
                                  index=list(tech_names.values()).index(selected_task["technician_id"]),
@@ -242,13 +256,14 @@ def update_task_ui():
         try:
             ws = get_worksheet(WORKSHEET_NAME)
             records = ws.get_all_records()
+            headers = ws.row_values(1)
             for idx, rec in enumerate(records, start=2):
                 if int(rec.get("ID")) == selected_task["id"]:
-                    ws.update_cell(idx, 2, new_tech_name)
-                    ws.update_cell(idx, 3, new_description)
-                    ws.update_cell(idx, 4, new_equipment_id)  # UPDATE Equipment ID column
-                    ws.update_cell(idx, 5, new_status)
-                    ws.update_cell(idx, 6, new_completed_at)
+                    ws.update_cell(idx, headers.index("Technician") + 1, new_tech_name)
+                    ws.update_cell(idx, headers.index("Description") + 1, new_description)
+                    ws.update_cell(idx, headers.index("Equipment ID") + 1, new_equipment_id)
+                    ws.update_cell(idx, headers.index("Status") + 1, new_status)
+                    ws.update_cell(idx, headers.index("Completed At") + 1, new_completed_at)
                     break
 
             st.session_state.tasks = load_tasks_from_sheet()
@@ -261,9 +276,9 @@ def report_ui():
     tasks = st.session_state.tasks
     techs = st.session_state.tech
     cutoff = datetime.now() - timedelta(days=30)
-    
+
     done_tasks = [t for t in tasks if t["done"] and t.get("completed_at") and datetime.fromisoformat(t["completed_at"]) >= cutoff]
-    
+
     if not done_tasks:
         st.write("No tasks completed in the last 30 days.")
     else:
@@ -271,15 +286,15 @@ def report_ui():
         for t in done_tasks:
             tech_name = get_technician_name(techs, t["technician_id"])
             comp_date = datetime.fromisoformat(t["completed_at"]).strftime("%Y-%m-%d")
-            
+
             report_data.append({
                 "ID": t["id"],
                 "Description": t["description"],
-                "Equipment ID": t.get("equipment_id", ""),  # OPTIONAL
+                "Equipment ID": t.get("equipment_id", ""),
                 "Technician": tech_name,
                 "Date Completed": comp_date
             })
-        
+
         st.dataframe(report_data)
 
 # ---------------------- MAIN ----------------------
@@ -318,7 +333,7 @@ def main():
         st.subheader(st.session_state.page)
 
         if st.session_state.page == "Home":
-            st.write("Welcome to the Service Tracker App for Enabl. You can find all tasks and report for all done tasks.Plese contact ia@enabl.dk for new users and technicians")
+            st.write("Welcome to the Service Tracker App for Enabl. Contact ia@enabl.dk for support.")
         elif st.session_state.page == "List Technicians":
             list_technicians_ui()
         elif st.session_state.page == "Add Task":
@@ -335,3 +350,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+s
